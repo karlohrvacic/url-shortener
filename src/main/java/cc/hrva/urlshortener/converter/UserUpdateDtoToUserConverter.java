@@ -19,7 +19,6 @@ public class UserUpdateDtoToUserConverter implements Converter<UserUpdateDto, Us
         final var existingUser = userRepository.findById(userUpdateDto.getId())
                 .orElseThrow(() -> new UserDoesntExistException(String.format("User with ID %d has not been found",
                         userUpdateDto.getId())));
-        existingUser.setName(userUpdateDto.getName());
         existingUser.setEmail(userUpdateDto.getEmail());
         existingUser.setApiKeySlots(userUpdateDto.getApiKeySlots());
         existingUser.setActive(userUpdateDto.getActive());

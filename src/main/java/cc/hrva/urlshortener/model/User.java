@@ -28,9 +28,6 @@ public class User {
     @GeneratedValue(generator = "user_account_id_seq", strategy = GenerationType.SEQUENCE)
     private Long id;
 
-    @NotBlank(message = "You need to enter your name")
-    private String name;
-
     @NotBlank(message = "You need to enter email")
     @Email(message = "Email not valid")
     private String email;

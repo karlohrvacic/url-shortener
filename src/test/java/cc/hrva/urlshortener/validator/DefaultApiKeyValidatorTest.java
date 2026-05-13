@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Optional;
 import cc.hrva.urlshortener.exception.ApiKeyDoesntExistException;
 import cc.hrva.urlshortener.exception.ApiKeyIsNotValid;
+import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.model.codebook.Authorities;
@@ -62,6 +63,7 @@ class DefaultApiKeyValidatorTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test
     void shouldFailVerifyUserAdminOrOwner() {
         final Authorities authorities = Authorities.builder().id(1L).name("ROLE_USER").build();
         final User user = User.builder().authorities(Collections.singletonList(authorities)).build();
@@ -70,8 +72,8 @@ class DefaultApiKeyValidatorTest {
         when(userService.getUserFromToken()).thenReturn(user);
 
         assertThatThrownBy(() -> apiKeyValidator.verifyUserAdminOrOwner(apiKey))
-                .isInstanceOf(ApiKeyDoesntExistException.class)
-                .hasMessage("API key doesn't exist");
+                .isInstanceOf(NoAuthorizationException.class)
+                .hasMessage("You don't have authorization for this action");
     }
 
     @Test

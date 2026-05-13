@@ -12,7 +12,6 @@ public class UserToUserDtoConverter implements Converter<User, UserDto> {
     public UserDto convert(User user) {
         return UserDto.builder()
                 .id(user.getId())
-                .name(user.getName())
                 .email(user.getEmail())
                 .apiKeySlots(user.getApiKeySlots())
                 .authorities(user.getAuthorities())

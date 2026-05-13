@@ -1,15 +1,13 @@
 package cc.hrva.urlshortener.beans;
 
 import cc.hrva.urlshortener.configuration.properties.GoogleApiProperties;
-import cc.hrva.urlshortener.model.enums.PlatformType;
-import cc.hrva.urlshortener.model.enums.ThreatEntryType;
-import cc.hrva.urlshortener.model.enums.ThreatType;
-import com.google.api.services.safebrowsing.v4.model.*;
+import com.google.api.services.safebrowsing.v5.Safebrowsing;
+import com.google.api.services.safebrowsing.v5.model.GoogleSecuritySafebrowsingV5SearchUrlsResponse;
+import com.google.api.services.safebrowsing.v5.model.GoogleSecuritySafebrowsingV5ThreatUrl;
+import java.io.IOException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-
-import java.util.Arrays;
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -17,40 +15,30 @@ public class GoogleSafeBrowsingApi {
 
     private final GoogleApiProperties googleApiProperties;
 
-    public GoogleSecuritySafebrowsingV4FindThreatMatchesRequest createFindThreatMatchesRequest(List<String> urls) {
-        final var findThreatMatchesRequest = new GoogleSecuritySafebrowsingV4FindThreatMatchesRequest();
-        findThreatMatchesRequest.setClient(getClientInfo());
-        findThreatMatchesRequest.setThreatInfo(getThreatInfo(urls));
-
-        return findThreatMatchesRequest;
+    public Safebrowsing.Urls.Search createUrlSearchRequest(final Safebrowsing safebrowsing, final List<String> urls) {
+        try {
+            return safebrowsing.urls()
+                    .search()
+                    .setUrls(urls);
+        } catch (final IOException exception) {
+            throw new RuntimeException("Failed to create Safe Browsing search request", exception);
+        }
     }
 
-    private GoogleSecuritySafebrowsingV4ThreatInfo getThreatInfo(List<String> urls) {
-        final var threatInfo = new GoogleSecuritySafebrowsingV4ThreatInfo();
-        final var threatEntries = urls.stream().map(this::getThreatEntry).toList();
-        final var threatTypes = Arrays.stream(ThreatType.values()).map(ThreatType::getValue).toList();
-
-        threatInfo.setThreatTypes(threatTypes);
-        threatInfo.setPlatformTypes(List.of(PlatformType.ANY_PLATFORM.getValue()));
-        threatInfo.setThreatEntryTypes(List.of(ThreatEntryType.URL.getValue()));
-        threatInfo.setThreatEntries(threatEntries);
-
-        return threatInfo;
+    public GoogleSecuritySafebrowsingV5SearchUrlsResponse executeSearch(final Safebrowsing.Urls.Search search) throws IOException {
+        return search
+                .setKey(googleApiProperties.getKey())
+                .execute();
     }
 
-    private GoogleSecuritySafebrowsingV4ClientInfo getClientInfo() {
-        final var clientInfo = new GoogleSecuritySafebrowsingV4ClientInfo();
-        clientInfo.setClientId(googleApiProperties.getClientId());
-        clientInfo.setClientVersion(googleApiProperties.getClientVersion());
+    public List<String> extractThreatUrls(final GoogleSecuritySafebrowsingV5SearchUrlsResponse response) {
+        if (response == null || response.getThreats() == null) {
+            return List.of();
+        }
 
-        return clientInfo;
-    }
-
-    private GoogleSecuritySafebrowsingV4ThreatEntry getThreatEntry(final String url) {
-        final var threatEntry = new GoogleSecuritySafebrowsingV4ThreatEntry();
-        threatEntry.set("url", url);
-
-        return threatEntry;
+        return response.getThreats().stream()
+                .map(GoogleSecuritySafebrowsingV5ThreatUrl::getUrl)
+                .toList();
     }
 
 }

@@ -23,7 +23,7 @@ app:
   email-sender-address: no-reply@hrva.cc
   contact-email: info@localhost
   server-url: localhost
-  frontend-url: http://localhost:8081
+  frontend-url: http://localhost:4200
   anonymous-url-creation-enabled: false
 
 server:

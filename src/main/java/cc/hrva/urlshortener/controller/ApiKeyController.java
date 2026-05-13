@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("api/v1/key")
+@RequestMapping("api/v1/api-key")
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;

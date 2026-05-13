@@ -69,12 +69,12 @@ class UrlServiceTest {
         this.urlService = new DefaultUrlService(
                 userService,
                 urlValidator,
-                taskExecutor,
                 apiKeyService,
                 urlRepository,
                 appProperties,
                 apiKeyValidator,
                 ipAddressService,
+                taskExecutor,
                 urlToPeekUrlConverter,
                 createUrlToUrlConverter,
                 urlUpdateDtoToUrlConverter
@@ -96,14 +96,18 @@ class UrlServiceTest {
         verify(urlValidator).longUrlInUrl(url);
     }
 
+    @Test
     void shouldReturnSavedUrlRandomShortUrl() {
-        final var url = CreateUrlDto.builder().longUrl("long").build();
+        final var createUrlDto = CreateUrlDto.builder().longUrl("long").build();
+        final var url = Url.builder().longUrl("long").build();
         final var existingLongUrl = Url.builder().longUrl("long").active(true).build();
 
-        when(urlRepository.existsUrlByLongUrlAndActiveTrue(url.getLongUrl())).thenReturn(true);
+        when(createUrlToUrlConverter.convert(createUrlDto)).thenReturn(url);
+        when(userService.getUserFromToken()).thenReturn(null);
+        when(urlRepository.existsUrlByLongUrlAndActiveTrueAndOwnerIsNull(url.getLongUrl())).thenReturn(true);
         when(urlRepository.findByLongUrlAndActiveTrue(url.getLongUrl())).thenReturn(Optional.ofNullable(existingLongUrl));
 
-        assertThat(urlService.saveUrlRouting(url)).isEqualTo(existingLongUrl);
+        assertThat(urlService.saveUrlRouting(createUrlDto)).isEqualTo(existingLongUrl);
     }
 
     @Test
@@ -136,19 +140,21 @@ class UrlServiceTest {
         assertThat(urlService.getAllMyUrls(apiKey)).isEqualTo(urls);
     }
 
+    @Test
     void shouldSaveUrlWithApiKeyWithFirstApiKeyForLoggedInUser() {
         final var createUrlDto = CreateUrlDto.builder().shortUrl("").build();
         final var url = Url.builder().shortUrl("").build();
         final var apiKey = ApiKey.builder().id(1L).key("key").apiCallsUsed(0L).apiCallsLimit(10L).active(true).build();
         final var user = User.builder().id(1L).apiKeys(Collections.singletonList(apiKey)).build();
 
+        when(createUrlToUrlConverter.convert(createUrlDto)).thenReturn(url);
         when(userService.getUserFromToken()).thenReturn(user);
         when(urlRepository.save(url)).thenReturn(url);
+        when(appProperties.getShortUrlLength()).thenReturn(1L);
 
         assertThat(urlService.saveUrlWithApiKey(createUrlDto, null)).isEqualTo(url);
 
-        verify(urlValidator).longUrlInUrl(url);
-        verify(apiKeyValidator).apiKeyExistsByKeyAndIsValid(null);
+        verify(apiKeyValidator).apiKeyExistsByKeyAndIsValid("key");
         verify(apiKeyService).apiKeyUseAction(any(ApiKey.class));
     }
 

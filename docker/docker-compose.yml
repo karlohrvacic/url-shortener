@@ -1,6 +1,7 @@
+name: url-shortener
 services:
   db:
-    image: postgres:latest
+    image: postgres:18
     restart: always
     environment:
       - POSTGRES_USER=root
@@ -9,13 +10,13 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
 
   redis:
-    image: redis:latest
+    image: redis:8
 
   mailhog:
-    image: mailhog/mailhog:latest
+    image: mailhog/mailhog:v1.0.1
     ports:
       - '8025:8025'
 

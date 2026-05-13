@@ -92,7 +92,7 @@ public class DefaultSendingEmailService implements SendingEmailService {
 
     private Context getContext(final User user) {
         final var ctx = new Context();
-        ctx.setVariable("name", user.getName());
+        ctx.setVariable("name", user.getEmail());
         ctx.setVariable("number_of_api_keys", user.getApiKeySlots().toString());
         ctx.setVariable("app_name", appProperties.getAppName());
         ctx.setVariable("contact_email", appProperties.getContactEmail());

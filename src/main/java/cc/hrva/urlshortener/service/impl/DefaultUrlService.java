@@ -23,8 +23,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.apachecommons.CommonsLog;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,12 +38,12 @@ public class DefaultUrlService implements UrlService {
 
     private final UserService userService;
     private final UrlValidator urlValidator;
-    private final TaskExecutor taskExecutor;
     private final ApiKeyService apiKeyService;
     private final UrlRepository urlRepository;
     private final AppProperties appProperties;
     private final ApiKeyValidator apiKeyValidator;
     private final IPAddressService ipAddressService;
+    private final TaskExecutor applicationTaskExecutor;
     private final UrlToPeekUrlConverter urlToPeekUrlConverter;
     private final CreateUrlToUrlConverter createUrlToUrlConverter;
     private final UrlUpdateDtoToUrlConverter urlUpdateDtoToUrlConverter;
@@ -212,7 +210,7 @@ public class DefaultUrlService implements UrlService {
     }
 
     private void asyncCheckIfVisitUnique(final String clientIP, final Url url) {
-        taskExecutor.execute(() -> {
+        applicationTaskExecutor.execute(() -> {
             if (!ipAddressService.urlAlreadyVisitedByIP(url, clientIP)) {
                 incrementVisitForUrl(url);
             }

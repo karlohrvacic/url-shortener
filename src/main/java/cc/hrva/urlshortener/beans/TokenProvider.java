@@ -3,11 +3,10 @@ package cc.hrva.urlshortener.beans;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.stream.Collectors;
@@ -25,59 +24,66 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TokenProvider {
 
-    private static final String AUTHORITIES_KEY = "auth";
-    private static final Long SECONDS_TO_MILLISECONDS = 1000L;
+  private static final String AUTHORITIES_KEY = "auth";
+  private static final Long SECONDS_TO_MILLISECONDS = 1000L;
 
-    private final AppProperties appProperties;
+  private final AppProperties appProperties;
 
-    private Key key;
-    private long tokenValidityInMilliseconds;
+  private SecretKey key;
+  private long tokenValidityInMilliseconds;
 
-    @PostConstruct
-    public void init() {
-        final var keyBytes = Decoders.BASE64.decode(appProperties.getJwtBase64Secret());
-        this.key = Keys.hmacShaKeyFor(keyBytes);
-        this.tokenValidityInMilliseconds = SECONDS_TO_MILLISECONDS * appProperties.getJwtTokenValiditySeconds();
+  @PostConstruct
+  public void init() {
+    final var keyBytes = Decoders.BASE64.decode(appProperties.getJwtBase64Secret());
+    this.key = Keys.hmacShaKeyFor(keyBytes);
+    this.tokenValidityInMilliseconds = SECONDS_TO_MILLISECONDS * appProperties.getJwtTokenValiditySeconds();
+  }
+
+  public String createToken(final Authentication authentication) {
+    final var now = (new Date()).getTime();
+    final var validity = new Date(now + this.tokenValidityInMilliseconds);
+    final var authorities = authentication.getAuthorities().stream()
+                                          .map(GrantedAuthority::getAuthority)
+                                          .collect(Collectors.joining(","));
+
+    return Jwts.builder()
+               .subject(authentication.getName())
+               .claim(AUTHORITIES_KEY, authorities)
+               .expiration(validity)
+               .signWith(key, Jwts.SIG.HS512)
+               .compact();
+  }
+
+  public Authentication getAuthentication(final String token) {
+    final var claims = Jwts.parser()
+                           .verifyWith(key)
+                           .build()
+                           .parseSignedClaims(token)
+                           .getPayload();
+
+    final var authorities = Arrays.stream(claims.get(AUTHORITIES_KEY).toString().split(","))
+                                  .map(SimpleGrantedAuthority::new)
+                                  .toList();
+
+    final var principal = new User(claims.getSubject(), "", authorities);
+
+    return new UsernamePasswordAuthenticationToken(principal, token, authorities);
+  }
+
+  public boolean validateToken(final String authToken) {
+    try {
+      Jwts.parser()
+          .verifyWith(key)
+          .build()
+          .parseSignedClaims(authToken);
+
+      return true;
+    } catch (final JwtException | IllegalArgumentException e) {
+      log.info("Invalid JWT token.");
+      log.trace("Invalid JWT token trace.", e);
     }
 
-    public String createToken(final Authentication authentication) {
-        final var now = (new Date()).getTime();
-        final var validity = new Date(now + this.tokenValidityInMilliseconds);
-        final var authorities = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.joining(","));
-
-        return Jwts.builder()
-                .setSubject(authentication.getName())
-                .claim(AUTHORITIES_KEY, authorities)
-                .signWith(key, SignatureAlgorithm.HS512)
-                .setExpiration(validity)
-                .compact();
-    }
-
-    public Authentication getAuthentication(final String token) {
-        final var claims = Jwts.parser().setSigningKey(key).parseClaimsJws(token).getBody();
-
-        final var authorities = Arrays
-                .stream(claims.get(AUTHORITIES_KEY).toString().split(","))
-                .map(SimpleGrantedAuthority::new)
-                .toList();
-
-        final var principal = new User(claims.getSubject(), "", authorities);
-
-        return new UsernamePasswordAuthenticationToken(principal, token, authorities);
-    }
-
-    public boolean validateToken(final String authToken) {
-        try {
-            Jwts.parser().setSigningKey(key).parseClaimsJws(authToken);
-
-            return true;
-        } catch (final JwtException | IllegalArgumentException e) {
-            log.info("Invalid JWT token.");
-            log.trace("Invalid JWT token trace.", e);
-        }
-
-        return false;
-    }
+    return false;
+  }
 
 }
-

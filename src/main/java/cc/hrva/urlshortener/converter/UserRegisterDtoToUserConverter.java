@@ -21,7 +21,6 @@ public class UserRegisterDtoToUserConverter implements Converter<UserRegisterDto
     @Override
     public User convert(final UserRegisterDto userRegisterDto) {
         return User.builder()
-                .name(userRegisterDto.getName())
                 .email(userRegisterDto.getEmail())
                 .password(passwordEncoder.encode(userRegisterDto.getPassword()))
                 .authorities(List.of(authoritiesService.getDefaultAuthority()))
