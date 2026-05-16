@@ -9,6 +9,7 @@ import cc.hrva.urlshortener.dto.PasswordResetDto;
 import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
+import cc.hrva.urlshortener.dto.UserSearchDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.exception.UserNotFoundException;
@@ -23,21 +24,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 @ExtendWith(MockitoExtension.class)
 class DefaultUserServiceTest {
@@ -141,7 +143,33 @@ class DefaultUserServiceTest {
         final var users = new PageImpl<>(Collections.singletonList(User.builder().id(1L).build()));
         when(userRepository.findAll(pageable)).thenReturn(users);
 
-        assertThat(userService.fetchAllUsers(pageable)).isEqualTo(users);
+        assertThat(userService.fetchAllUsers(pageable, new UserSearchDto())).isEqualTo(users);
+    }
+
+    @Test
+    void shouldFetchAllUsersWithSearchFilter() {
+        final var pageable = PageRequest.of(0, 20);
+        final var user = User.builder().id(1L).email("test@example.com").build();
+        final var users = new PageImpl<>(Collections.singletonList(user));
+        final var search = new UserSearchDto();
+        search.setSearch("example");
+
+        when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(users);
+
+        assertThat(userService.fetchAllUsers(pageable, search)).isEqualTo(users);
+    }
+
+    @Test
+    void shouldFetchAllUsersWithActiveFilter() {
+        final var pageable = PageRequest.of(0, 20);
+        final var user = User.builder().id(1L).email("test@example.com").active(true).build();
+        final var users = new PageImpl<>(Collections.singletonList(user));
+        final var search = new UserSearchDto();
+        search.setActive(true);
+
+        when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(users);
+
+        assertThat(userService.fetchAllUsers(pageable, search)).isEqualTo(users);
     }
 
     @Test

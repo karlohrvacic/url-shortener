@@ -8,10 +8,11 @@ import cc.hrva.urlshortener.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface UrlRepository extends JpaRepository<Url, Long> {
+public interface UrlRepository extends JpaRepository<Url, Long>, JpaSpecificationExecutor<Url> {
 
     Page<Url> findAllByOwner(User owner, Pageable pageable);
     boolean existsUrlByLongUrlAndActiveTrue(String longUrl);

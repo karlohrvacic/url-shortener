@@ -6,6 +6,7 @@ import cc.hrva.urlshortener.converter.UrlToPeekUrlConverter;
 import cc.hrva.urlshortener.converter.UrlUpdateDtoToUrlConverter;
 import cc.hrva.urlshortener.dto.CreateUrlDto;
 import cc.hrva.urlshortener.dto.UrlResponse;
+import cc.hrva.urlshortener.dto.UrlSearchDto;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
 import cc.hrva.urlshortener.exception.UrlNotFoundException;
 import cc.hrva.urlshortener.model.ApiKey;
@@ -13,6 +14,7 @@ import cc.hrva.urlshortener.model.PeekUrl;
 import cc.hrva.urlshortener.model.Url;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.UrlRepository;
+import cc.hrva.urlshortener.repository.specification.UrlSpecification;
 import cc.hrva.urlshortener.service.ApiKeyService;
 import cc.hrva.urlshortener.service.IPAddressService;
 import cc.hrva.urlshortener.service.UrlService;
@@ -29,6 +31,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.view.RedirectView;
@@ -103,7 +106,8 @@ public class DefaultUrlService implements UrlService {
     }
 
     @Override
-    public Page<UrlResponse> getAllMyUrls(final String apiKey, final Pageable pageable) {
+    public Page<UrlResponse> getAllMyUrls(final String apiKey, final Pageable pageable,
+            final UrlSearchDto search) {
         final User user;
         if (StringUtils.isNotEmpty(apiKey)) {
             apiKeyValidator.apiKeyExistsByKeyAndIsValid(apiKey);
@@ -112,7 +116,25 @@ public class DefaultUrlService implements UrlService {
             user = userService.getUserFromToken();
         }
 
-        return urlRepository.findAllByOwner(user, pageable).map(UrlResponse::from);
+        var spec = Specification.where(UrlSpecification.hasOwner(user));
+
+        if (StringUtils.isNotEmpty(search.getSearch())) {
+            spec = spec.and(UrlSpecification.search(search.getSearch()));
+        }
+        if (search.getActive() != null) {
+            spec = spec.and(UrlSpecification.hasActive(search.getActive()));
+        }
+        if (search.getExpired() != null && search.getExpired()) {
+            spec = spec.and(UrlSpecification.isExpired());
+        }
+        if (search.getDateFrom() != null) {
+            spec = spec.and(UrlSpecification.createdAfter(search.getDateFrom()));
+        }
+        if (search.getDateTo() != null) {
+            spec = spec.and(UrlSpecification.createdBefore(search.getDateTo()));
+        }
+
+        return urlRepository.findAll(spec, pageable).map(UrlResponse::from);
     }
 
     @Override

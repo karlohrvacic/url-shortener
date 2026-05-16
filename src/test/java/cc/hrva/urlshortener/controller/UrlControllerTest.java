@@ -135,7 +135,7 @@ class UrlControllerTest {
         final var urlList = Collections.singletonList(urlResponse);
         final var pageable = PageRequest.of(0, 20);
         final var urls = new PageImpl<>(urlList, pageable, urlList.size());
-        when(urlService.getAllMyUrls(eq("apikey"), any(Pageable.class))).thenReturn(urls);
+        when(urlService.getAllMyUrls(eq("apikey"), any(Pageable.class), any())).thenReturn(urls);
 
         mockMvc.perform(get("/api/v1/urls")
                         .header("X-Api-Key", "apikey")

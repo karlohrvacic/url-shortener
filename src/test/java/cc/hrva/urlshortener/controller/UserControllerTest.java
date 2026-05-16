@@ -65,7 +65,7 @@ class UserControllerTest {
         final var userList = Collections.singletonList(User.builder().id(1L).email("test@example.com").build());
         final var pageable = PageRequest.of(0, 20);
         final var users = new PageImpl<>(userList, pageable, userList.size());
-        when(userService.fetchAllUsers(any(Pageable.class))).thenReturn(users);
+        when(userService.fetchAllUsers(any(Pageable.class), any())).thenReturn(users);
 
         mockMvc.perform(get("/api/v1/users").param("page", "0").param("size", "20"))
                 .andExpect(status().isOk())

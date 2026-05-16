@@ -7,20 +7,24 @@ import cc.hrva.urlshortener.dto.PasswordResetDto;
 import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
+import cc.hrva.urlshortener.dto.UserSearchDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.exception.ApiException;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.exception.UserNotFoundException;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.UserRepository;
+import cc.hrva.urlshortener.repository.specification.UserSpecification;
 import cc.hrva.urlshortener.service.ResetTokenService;
 import cc.hrva.urlshortener.service.UserService;
 import cc.hrva.urlshortener.validator.AuthValidator;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -87,8 +91,20 @@ public class DefaultUserService implements UserService {
     }
 
     @Override
-    public Page<User> fetchAllUsers(final Pageable pageable) {
-        return userRepository.findAll(pageable);
+    public Page<User> fetchAllUsers(final Pageable pageable, final UserSearchDto search) {
+        Specification<User> spec = null;
+
+        if (StringUtils.isNotEmpty(search.getSearch())) {
+            spec = UserSpecification.search(search.getSearch());
+        }
+        if (search.getActive() != null) {
+            spec = (spec == null) ? UserSpecification.hasActive(search.getActive()) : spec.and(UserSpecification.hasActive(search.getActive()));
+        }
+
+        if (spec == null) {
+            return userRepository.findAll(pageable);
+        }
+        return userRepository.findAll(spec, pageable);
     }
 
     @Override

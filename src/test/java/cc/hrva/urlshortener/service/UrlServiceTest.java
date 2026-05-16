@@ -1,16 +1,19 @@
 package cc.hrva.urlshortener.service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.converter.CreateUrlToUrlConverter;
 import cc.hrva.urlshortener.converter.UrlToPeekUrlConverter;
 import cc.hrva.urlshortener.converter.UrlUpdateDtoToUrlConverter;
 import cc.hrva.urlshortener.dto.CreateUrlDto;
 import cc.hrva.urlshortener.dto.UrlResponse;
+import cc.hrva.urlshortener.dto.UrlSearchDto;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.Url;
 import cc.hrva.urlshortener.model.User;
@@ -27,6 +30,7 @@ import org.springframework.core.task.TaskExecutor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -145,9 +149,88 @@ class UrlServiceTest {
         final var urls = new PageImpl<>(Collections.singletonList(url));
 
         when(apiKeyService.fetchApiKeyByKey(apiKey)).thenReturn(key);
-        when(urlRepository.findAllByOwner(user, pageable)).thenReturn(urls);
+        when(urlRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(urls);
 
-        final var result = urlService.getAllMyUrls(apiKey, pageable);
+        final var result = urlService.getAllMyUrls(apiKey, pageable, new UrlSearchDto());
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+    }
+
+    @Test
+    void shouldFetchUrlsWithSearchFilter() {
+        final var apiKey = "apikey";
+        final var user = User.builder().build();
+        final var key = ApiKey.builder().owner(user).build();
+        final var pageable = PageRequest.of(0, 20);
+        final var url = Url.builder().longUrl("https://example.com").build();
+        final var urls = new PageImpl<>(Collections.singletonList(url));
+        final var search = new UrlSearchDto();
+        search.setSearch("example");
+
+        when(apiKeyService.fetchApiKeyByKey(apiKey)).thenReturn(key);
+        when(urlRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(urls);
+
+        final var result = urlService.getAllMyUrls(apiKey, pageable, search);
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().getFirst().longUrl()).isEqualTo("https://example.com");
+    }
+
+    @Test
+    void shouldFetchUrlsWithActiveFilter() {
+        final var apiKey = "apikey";
+        final var user = User.builder().build();
+        final var key = ApiKey.builder().owner(user).build();
+        final var pageable = PageRequest.of(0, 20);
+        final var url = Url.builder().active(true).build();
+        final var urls = new PageImpl<>(Collections.singletonList(url));
+        final var search = new UrlSearchDto();
+        search.setActive(true);
+
+        when(apiKeyService.fetchApiKeyByKey(apiKey)).thenReturn(key);
+        when(urlRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(urls);
+
+        final var result = urlService.getAllMyUrls(apiKey, pageable, search);
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().getFirst().active()).isTrue();
+    }
+
+    @Test
+    void shouldFetchUrlsWithExpiredFilter() {
+        final var apiKey = "apikey";
+        final var user = User.builder().build();
+        final var key = ApiKey.builder().owner(user).build();
+        final var pageable = PageRequest.of(0, 20);
+        final var url = Url.builder().expirationDate(LocalDateTime.now().minusDays(1)).build();
+        final var urls = new PageImpl<>(Collections.singletonList(url));
+        final var search = new UrlSearchDto();
+        search.setExpired(true);
+
+        when(apiKeyService.fetchApiKeyByKey(apiKey)).thenReturn(key);
+        when(urlRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(urls);
+
+        final var result = urlService.getAllMyUrls(apiKey, pageable, search);
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+    }
+
+    @Test
+    void shouldFetchUrlsWithDateRangeFilter() {
+        final var apiKey = "apikey";
+        final var user = User.builder().build();
+        final var key = ApiKey.builder().owner(user).build();
+        final var pageable = PageRequest.of(0, 20);
+        final var url = Url.builder().createDate(LocalDateTime.now()).build();
+        final var urls = new PageImpl<>(Collections.singletonList(url));
+        final var search = new UrlSearchDto();
+        search.setDateFrom(LocalDateTime.now().minusDays(7));
+        search.setDateTo(LocalDateTime.now().plusDays(1));
+
+        when(apiKeyService.fetchApiKeyByKey(apiKey)).thenReturn(key);
+        when(urlRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(urls);
+
+        final var result = urlService.getAllMyUrls(apiKey, pageable, search);
         assertThat(result).isNotNull();
         assertThat(result.getContent()).hasSize(1);
     }

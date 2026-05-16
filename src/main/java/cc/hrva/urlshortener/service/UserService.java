@@ -4,6 +4,7 @@ import cc.hrva.urlshortener.dto.PasswordResetDto;
 import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
+import cc.hrva.urlshortener.dto.UserSearchDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.model.User;
 import org.springframework.data.domain.Page;
@@ -14,7 +15,7 @@ public interface UserService {
     User getUserFromToken();
     User register(User user);
     UserDto fetchCurrentUser();
-    Page<User> fetchAllUsers(Pageable pageable);
+    Page<User> fetchAllUsers(Pageable pageable, UserSearchDto search);
     void persistUser(User user);
     void deleteUserById(Long id);
     void userHasLoggedIn(User user);

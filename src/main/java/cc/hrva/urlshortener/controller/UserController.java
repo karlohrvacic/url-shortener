@@ -2,6 +2,7 @@ package cc.hrva.urlshortener.controller;
 
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
+import cc.hrva.urlshortener.dto.UserSearchDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.service.UserService;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -36,12 +38,13 @@ public class UserController {
         return ResponseEntity.ok(userService.fetchCurrentUser());
     }
 
-    @Operation(summary = "Get all users (admin)", description = "Retrieve paginated list of all users. Requires ROLE_ADMIN.")
+    @Operation(summary = "Get all users (admin)", description = "Retrieve paginated list of all users. Supports filtering by search and active. Requires ROLE_ADMIN.")
     @GetMapping
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Page<User>> fetchAllUsers(
-            @PageableDefault(size = 20) final Pageable pageable) {
-        return ResponseEntity.ok(userService.fetchAllUsers(pageable));
+            @PageableDefault(size = 20) final Pageable pageable,
+            @ModelAttribute final UserSearchDto search) {
+        return ResponseEntity.ok(userService.fetchAllUsers(pageable, search));
     }
 
     @Operation(summary = "Delete a user (admin)", description = "Permanently delete a user by ID. Requires ROLE_ADMIN.")

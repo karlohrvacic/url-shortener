@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import cc.hrva.urlshortener.dto.CreateUrlDto;
 import cc.hrva.urlshortener.dto.LinkPreviewResponse;
 import cc.hrva.urlshortener.dto.UrlResponse;
+import cc.hrva.urlshortener.dto.UrlSearchDto;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
 import cc.hrva.urlshortener.exception.ApiException;
 import cc.hrva.urlshortener.model.PeekUrl;
@@ -26,6 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -141,13 +143,14 @@ public class UrlController {
                 .body(csv);
     }
 
-    @Operation(summary = "Get my URLs", description = "Retrieve paginated list of URLs owned by the authenticated user. Requires ROLE_USER.")
+    @Operation(summary = "Get my URLs", description = "Retrieve paginated list of URLs owned by the authenticated user. Supports filtering by search, active, expired, dateFrom, and dateTo. Requires ROLE_USER.")
     @GetMapping
     @PreAuthorize("hasRole('ROLE_USER')")
     public ResponseEntity<Page<UrlResponse>> getAllMyUrls(
             @RequestHeader(value = "X-Api-Key", required = false) final String apiKey,
-            @PageableDefault(size = 20) final Pageable pageable) {
-        return ResponseEntity.ok(urlService.getAllMyUrls(apiKey, pageable));
+            @PageableDefault(size = 20) final Pageable pageable,
+            @ModelAttribute final UrlSearchDto search) {
+        return ResponseEntity.ok(urlService.getAllMyUrls(apiKey, pageable, search));
     }
 
     @Operation(summary = "Get all URLs (admin)", description = "Retrieve paginated list of all URLs in the system. Requires ROLE_ADMIN.")
