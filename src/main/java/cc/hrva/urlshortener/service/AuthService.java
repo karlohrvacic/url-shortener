@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 
 public interface AuthService {
 
-    String getClientIP(HttpServletRequest request);
     String register(UserRegisterDto userRegisterDto);
     ResponseEntity<JWTTokenDto> login(LoginDto loginDto, HttpServletRequest request);
 

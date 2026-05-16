@@ -1,4 +1,4 @@
-package cc.hrva.urlshortener.beans;
+package cc.hrva.urlshortener.configuration;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;

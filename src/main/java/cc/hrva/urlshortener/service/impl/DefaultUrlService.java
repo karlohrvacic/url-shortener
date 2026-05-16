@@ -5,6 +5,7 @@ import cc.hrva.urlshortener.converter.CreateUrlToUrlConverter;
 import cc.hrva.urlshortener.converter.UrlToPeekUrlConverter;
 import cc.hrva.urlshortener.converter.UrlUpdateDtoToUrlConverter;
 import cc.hrva.urlshortener.dto.CreateUrlDto;
+import cc.hrva.urlshortener.dto.UrlResponse;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
 import cc.hrva.urlshortener.exception.UrlNotFoundException;
 import cc.hrva.urlshortener.model.ApiKey;
@@ -20,19 +21,25 @@ import cc.hrva.urlshortener.validator.ApiKeyValidator;
 import cc.hrva.urlshortener.validator.UrlValidator;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.apachecommons.CommonsLog;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.view.RedirectView;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@CommonsLog
+@Slf4j
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class DefaultUrlService implements UrlService {
 
@@ -51,10 +58,12 @@ public class DefaultUrlService implements UrlService {
     @Override
     @Transactional
     public RedirectView redirectResultUrl(final String shortUrl, final String clientIP) {
+        log.info("Redirect shortUrl={} clientIP={}", shortUrl, clientIP);
+
         final RedirectView redirectView = new RedirectView();
 
         if (StringUtils.isNotEmpty(shortUrl) && urlRepository.existsUrlByShortUrlAndActiveTrue(shortUrl)) {
-            redirectView.setUrl(checkIPUniquenessAndReturnUrl(shortUrl, clientIP).getLongUrl());
+            redirectView.setUrl(checkIPUniquenessAndReturnUrl(shortUrl, clientIP).longUrl());
         } else {
             redirectView.setUrl(appProperties.getFrontendUrl());
         }
@@ -64,8 +73,10 @@ public class DefaultUrlService implements UrlService {
 
     @Override
     @Transactional
-    public Url saveUrlRouting(final @Valid CreateUrlDto createUrlDto) {
+    public UrlResponse saveUrlRouting(final @Valid CreateUrlDto createUrlDto) {
         final var url = createUrlToUrlConverter.convert(createUrlDto);
+
+        log.info("Creating URL longUrl={} authenticated={}", createUrlDto.getLongUrl(), userService.getUserFromToken() != null);
 
         urlValidator.longUrlInUrl(url);
         urlValidator.checkIfUrlSafe(url);
@@ -74,22 +85,25 @@ public class DefaultUrlService implements UrlService {
         if (userService.getUserFromToken() != null) {
             return saveUrlWithApiKey(createUrlDto, null);
         }
-        return createUrlForAnonymousUser(url);
+        return UrlResponse.from(createUrlForAnonymousUser(url));
     }
 
     @Override
     @Transactional
-    public Url saveUrlWithApiKey(final @Valid CreateUrlDto createUrlDto, final String key) {
+    public UrlResponse saveUrlWithApiKey(final @Valid CreateUrlDto createUrlDto, final String key) {
         final var url = createUrlToUrlConverter.convert(createUrlDto);
+
+        log.info("Creating URL with API key longUrl={}", createUrlDto.getLongUrl());
+
         final ApiKey apiKey = getApiKey(key);
         setShortUrlForLoggedInUser(url, apiKey);
 
         log.info("Saving URL");
-        return urlRepository.save(url);
+        return UrlResponse.from(urlRepository.save(url));
     }
 
     @Override
-    public List<Url> getAllMyUrls(final String apiKey) {
+    public Page<UrlResponse> getAllMyUrls(final String apiKey, final Pageable pageable) {
         final User user;
         if (StringUtils.isNotEmpty(apiKey)) {
             apiKeyValidator.apiKeyExistsByKeyAndIsValid(apiKey);
@@ -98,26 +112,33 @@ public class DefaultUrlService implements UrlService {
             user = userService.getUserFromToken();
         }
 
-        return urlRepository.findAllByOwner(user).orElse(null);
+        return urlRepository.findAllByOwner(user, pageable).map(UrlResponse::from);
     }
 
     @Override
-    public List<Url> getAllUrls() {
-        return urlRepository.findAll();
-    }
-
-    @Override
-    public Url revokeUrl(final Long id) {
-        final var url = urlRepository.findById(id).orElseThrow(() -> new UrlNotFoundException("Url doesn't exist"));
-
-        urlValidator.verifyUserAdminOrOwner(url);
-
-        return urlRepository.save(deactivateUrl(url));
+    public Page<UrlResponse> getAllUrls(final Pageable pageable) {
+        return urlRepository.findAll(pageable).map(UrlResponse::from);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "urls", key = "#result.shortUrl")
+    public UrlResponse revokeUrl(final Long id) {
+        log.info("Revoke URL id={}", id);
+
+        final var url = urlRepository.findById(id).orElseThrow(() -> new UrlNotFoundException("Url doesn't exist"));
+
+        urlValidator.verifyUserAdminOrOwner(url);
+
+        return UrlResponse.from(urlRepository.save(deactivateUrl(url)));
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "urls", allEntries = true)
     public void deleteUrl(final Long id) {
+        log.info("Delete URL id={}", id);
+
         final var url = urlRepository.findById(id).orElseThrow(() -> new UrlNotFoundException("Url doesn't exist"));
 
         urlValidator.verifyUserAdminOrOwner(url);
@@ -128,24 +149,68 @@ public class DefaultUrlService implements UrlService {
 
     @Override
     @Transactional
-    public Url updateUrl(final UrlUpdateDto updateDto) {
+    @CacheEvict(value = "urls", key = "#result.shortUrl")
+    public UrlResponse updateUrl(final UrlUpdateDto updateDto) {
+        log.info("Update URL id={}", updateDto.getId());
+
         final var url = urlUpdateDtoToUrlConverter.convert(updateDto);
         urlValidator.checkIfUrlExpirationDateIsInThePast(url);
 
         url.verifyUrlValidity(url);
-        return urlRepository.save(url);
+        return UrlResponse.from(urlRepository.save(url));
     }
 
     @Override
     @Transactional
-    public Url checkIPUniquenessAndReturnUrl(final String shortUrl, final String clientIP) {
+    public UrlResponse checkIPUniquenessAndReturnUrl(final String shortUrl, final String clientIP) {
+        log.info("URL access shortUrl={} clientIP={}", shortUrl, clientIP);
+
         final var url = findUrlByShortUrlAndActive(shortUrl);
 
         asyncCheckIfVisitUnique(clientIP, url);
-        return url;
+        return UrlResponse.from(url);
     }
 
     @Override
+    public byte[] exportMyUrlsAsCsv(final String apiKey) {
+        final var user = getUserForExport(apiKey);
+        final var urls = user != null
+                ? urlRepository.findAllByOwner(user, Pageable.unpaged()).getContent()
+                : List.<Url>of();
+
+        final var sb = new StringBuilder();
+        sb.append("Short URL,Long URL,Visits,Visit Limit,Created,Expires,Active\n");
+        for (final var url : urls) {
+            sb.append(String.format("%s,%s,%d,%d,%s,%s,%b\n",
+                    url.getShortUrl(),
+                    escapeCsv(url.getLongUrl()),
+                    url.getVisits(),
+                    url.getVisitLimit() != null ? url.getVisitLimit() : 0,
+                    url.getCreateDate() != null ? url.getCreateDate().toString() : "",
+                    url.getExpirationDate() != null ? url.getExpirationDate().toString() : "",
+                    url.isActive()));
+        }
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String escapeCsv(final String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
+    }
+
+    private User getUserForExport(final String apiKey) {
+        if (StringUtils.isNotEmpty(apiKey)) {
+            apiKeyValidator.apiKeyExistsByKeyAndIsValid(apiKey);
+            return apiKeyService.fetchApiKeyByKey(apiKey).getOwner();
+        }
+        return userService.getUserFromToken();
+    }
+
+    @Override
+    @Cacheable(value = "urls", key = "#shortUrl")
     public PeekUrl peekUrlByShortUrl(final String shortUrl) {
         final var url = findUrlByShortUrlAndActive(shortUrl);
 
@@ -153,13 +218,15 @@ public class DefaultUrlService implements UrlService {
     }
 
     @Override
+    @Transactional
+    @CacheEvict(value = "urls", allEntries = true)
     public void deactivateExpiredUrls() {
         final var urls = urlRepository.findByExpirationDateLessThanEqualAndActiveTrue(LocalDateTime.now()).stream()
                 .map(this::deactivateUrl)
                 .toList();
 
         urlRepository.saveAll(urls);
-        if (!urls.isEmpty()) log.info(String.format("Deactivated %d urls", urls.size()));
+        if (!urls.isEmpty()) log.info("Deactivated {} urls", urls.size());
     }
 
     @Override
@@ -182,7 +249,7 @@ public class DefaultUrlService implements UrlService {
 
         if (urlRepository.existsUrlByLongUrlAndActiveTrueAndOwnerIsNull(url.getLongUrl())) {
             final var existingLongUrl = getUrlByLongUrl(url.getLongUrl());
-            log.warn("Long url already exists in DB, will return URL from long URL " + existingLongUrl.getShortUrl());
+            log.warn("Long url already exists in DB, will return URL from long URL {}", existingLongUrl.getShortUrl());
             return existingLongUrl;
         }
 
@@ -226,7 +293,7 @@ public class DefaultUrlService implements UrlService {
 
         if (StringUtils.isEmpty(url.getShortUrl())) {
             url.setShortUrl(generateShortUrl(appProperties.getShortUrlLength()));
-            log.info(String.format("URL got generated short URL %s", url.getShortUrl()));
+            log.info("URL got generated short URL {}", url.getShortUrl());
         }
 
         urlValidator.checkIfShortUrlIsUnique(url.getShortUrl());
@@ -235,18 +302,18 @@ public class DefaultUrlService implements UrlService {
         url.setOwner(apiKey.getOwner());
         apiKeyService.apiKeyUseAction(apiKey);
 
-        log.info("URL is created with API key and is keeping custom short url: " + url.getShortUrl());
+        log.info("URL is created with API key and is keeping custom short url: {}", url.getShortUrl());
     }
 
     private ApiKey getFirstApiKeyForLoggedInUser() {
         log.info("User is authenticated but didn't pass API key");
 
-        return userService.getUserFromToken()
-                .getApiKeys()
+        final var user = userService.getUserFromToken();
+        return user.getApiKeys()
                 .stream()
                 .filter(ApiKey::isActive)
                 .findFirst()
-                .orElseGet(apiKeyService::generateNewApiKey);
+                .orElseGet(() -> apiKeyService.findApiKeyByKey(apiKeyService.generateNewApiKey().key()));
     }
 
     public Url deactivateUrl(Url url) {

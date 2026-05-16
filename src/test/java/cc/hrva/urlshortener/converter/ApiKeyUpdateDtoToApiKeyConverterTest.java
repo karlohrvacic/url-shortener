@@ -2,7 +2,7 @@ package cc.hrva.urlshortener.converter;
 
 import java.util.Optional;
 import cc.hrva.urlshortener.dto.ApiKeyUpdateDto;
-import cc.hrva.urlshortener.exception.ApiKeyDoesntExistException;
+import cc.hrva.urlshortener.exception.ApiKeyNotFoundException;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.repository.ApiKeyRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +46,7 @@ class ApiKeyUpdateDtoToApiKeyConverterTest {
         when(apiKeyRepository.findById(anyLong())).thenReturn(Optional.empty());
 
         assertThatCode(() -> converter.convert(apiKeyUpdateDto))
-                .isInstanceOf(ApiKeyDoesntExistException.class)
+                .isInstanceOf(ApiKeyNotFoundException.class)
                 .hasMessage(String.format("API key with ID %d has not been found", apiKeyUpdateDto.getId()));
     }
 }

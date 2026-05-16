@@ -14,5 +14,6 @@
     <include file="/db/changelog/table/ip_address.xml"/>
     <include file="/db/changelog/table/google_safe_browsing.xml"/>
     <include file="/db/changelog/table/V1.0.0_remove_name_from_user_table.xml"/>
+    <include file="classpath:/db/changelog/table/user_auth_provider.xml"/>
 
 </databaseChangeLog>

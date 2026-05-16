@@ -1,5 +1,6 @@
 package cc.hrva.urlshortener.listener;
 
+import cc.hrva.urlshortener.security.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import cc.hrva.urlshortener.service.LoginAttemptService;
@@ -12,16 +13,12 @@ import org.springframework.stereotype.Component;
 public class AuthenticationSuccessEventListener implements ApplicationListener<AuthenticationSuccessEvent> {
 
     private final HttpServletRequest request;
+    private final ClientIpResolver clientIpResolver;
     private final LoginAttemptService loginAttemptService;
 
     @Override
     public void onApplicationEvent(final AuthenticationSuccessEvent ignored) {
-        final var xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            loginAttemptService.loginSucceeded(request.getRemoteAddr());
-        } else {
-            loginAttemptService.loginSucceeded(xfHeader.split(",")[0]);
-        }
+        loginAttemptService.loginSucceeded(clientIpResolver.getClientIp(request));
     }
 
 }

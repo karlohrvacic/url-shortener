@@ -1,11 +1,13 @@
 package cc.hrva.urlshortener.service;
 
 import jakarta.servlet.http.HttpServletRequest;
-import cc.hrva.urlshortener.beans.JwtFilter;
-import cc.hrva.urlshortener.beans.TokenProvider;
+import cc.hrva.urlshortener.configuration.properties.AppProperties;
+import cc.hrva.urlshortener.security.JwtFilter;
+import cc.hrva.urlshortener.security.TokenProvider;
 import cc.hrva.urlshortener.converter.UserRegisterDtoToUserConverter;
 import cc.hrva.urlshortener.converter.UserToUserDtoConverter;
 import cc.hrva.urlshortener.dto.JWTTokenDto;
+import cc.hrva.urlshortener.security.ClientIpResolver;
 import cc.hrva.urlshortener.dto.LoginDto;
 import cc.hrva.urlshortener.dto.UserDto;
 import cc.hrva.urlshortener.dto.UserRegisterDto;
@@ -60,6 +62,12 @@ class DefaultAuthServiceTest {
     private UserRegisterDtoToUserConverter userRegisterDtoToUserConverter;
 
     @Mock
+    private ClientIpResolver clientIpResolver;
+
+    @Mock
+    private AppProperties appProperties;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -70,7 +78,7 @@ class DefaultAuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        this.authService = new DefaultAuthService(userService, userValidator, tokenProvider, loginAttemptService, userToUserDtoConverter, authenticationManagerBuilder, userRegisterDtoToUserConverter);
+        this.authService = new DefaultAuthService(userService, userValidator, tokenProvider, loginAttemptService, clientIpResolver, userToUserDtoConverter, authenticationManagerBuilder, userRegisterDtoToUserConverter, appProperties);
     }
 
     @Test
@@ -94,12 +102,12 @@ class DefaultAuthServiceTest {
         final var user = User.builder().id(1L).email("test@example.com").build();
         final var userDto = UserDto.builder().id(1L).email("test@example.com").build();
 
-        when(request.getHeader("X-FORWARDED-FOR")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
         when(loginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
         when(authenticationManagerBuilder.getObject()).thenReturn(authenticationManager);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
-        when(tokenProvider.createToken(authentication)).thenReturn("jwtToken");
+        when(appProperties.getJwtTokenValiditySeconds()).thenReturn(36000L);
+        when(tokenProvider.createToken(authentication, 36000L)).thenReturn("jwtToken");
         when(userService.fetchUserFromEmail("test@example.com")).thenReturn(user);
         when(userToUserDtoConverter.convert(user)).thenReturn(userDto);
 
@@ -117,8 +125,7 @@ class DefaultAuthServiceTest {
     void shouldThrowWhenBlocked() {
         final var loginDto = LoginDto.builder().email("test@example.com").password("password123").build();
 
-        when(request.getHeader("X-FORWARDED-FOR")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
         when(loginAttemptService.isBlocked("127.0.0.1")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.login(loginDto, request))
@@ -126,23 +133,4 @@ class DefaultAuthServiceTest {
                 .hasMessage("Request has been blocked");
     }
 
-    @Test
-    void shouldGetClientIPFromXForwardedFor() {
-        when(request.getHeader("X-FORWARDED-FOR")).thenReturn("10.0.0.1");
-
-        assertThat(authService.getClientIP(request)).isEqualTo("10.0.0.1");
-    }
-
-    @Test
-    void shouldGetClientIPFromRemoteAddr() {
-        when(request.getHeader("X-FORWARDED-FOR")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
-
-        assertThat(authService.getClientIP(request)).isEqualTo("127.0.0.1");
-    }
-
-    @Test
-    void shouldReturnEmptyStringWhenRequestIsNull() {
-        assertThat(authService.getClientIP(null)).isEmpty();
-    }
 }

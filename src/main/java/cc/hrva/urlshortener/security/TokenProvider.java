@@ -1,4 +1,4 @@
-package cc.hrva.urlshortener.beans;
+package cc.hrva.urlshortener.security;
 
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import io.jsonwebtoken.JwtException;
@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.apachecommons.CommonsLog;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -20,12 +20,13 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Component;
 
 @Component
-@CommonsLog
+@Slf4j
 @RequiredArgsConstructor
 public class TokenProvider {
 
   private static final String AUTHORITIES_KEY = "auth";
   private static final Long SECONDS_TO_MILLISECONDS = 1000L;
+  private static final Long REMEMBER_ME_VALIDITY_SECONDS = 2_592_000L; // 30 days
 
   private final AppProperties appProperties;
 
@@ -40,8 +41,12 @@ public class TokenProvider {
   }
 
   public String createToken(final Authentication authentication) {
+    return createToken(authentication, appProperties.getJwtTokenValiditySeconds());
+  }
+
+  public String createToken(final Authentication authentication, final long ttlSeconds) {
     final var now = (new Date()).getTime();
-    final var validity = new Date(now + this.tokenValidityInMilliseconds);
+    final var validity = new Date(now + SECONDS_TO_MILLISECONDS * ttlSeconds);
     final var authorities = authentication.getAuthorities().stream()
                                           .map(GrantedAuthority::getAuthority)
                                           .collect(Collectors.joining(","));

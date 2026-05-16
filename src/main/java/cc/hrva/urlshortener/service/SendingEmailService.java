@@ -7,6 +7,6 @@ public interface SendingEmailService {
 
     void sendWelcomeEmail(User user);
     void sendEmailAccountDeactivated(User user);
-    public void sendEmailForgotPassword(final User user, final ResetToken resetToken);
+    void sendEmailForgotPassword(User user, ResetToken resetToken);
 
 }

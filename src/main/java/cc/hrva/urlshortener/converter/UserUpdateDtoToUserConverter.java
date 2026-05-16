@@ -1,6 +1,6 @@
 package cc.hrva.urlshortener.converter;
 
-import cc.hrva.urlshortener.exception.UserDoesntExistException;
+import cc.hrva.urlshortener.exception.UserNotFoundException;
 import cc.hrva.urlshortener.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
@@ -17,7 +17,7 @@ public class UserUpdateDtoToUserConverter implements Converter<UserUpdateDto, Us
     @Override
     public User convert(final UserUpdateDto userUpdateDto) {
         final var existingUser = userRepository.findById(userUpdateDto.getId())
-                .orElseThrow(() -> new UserDoesntExistException(String.format("User with ID %d has not been found",
+                .orElseThrow(() -> new UserNotFoundException(String.format("User with ID %d has not been found",
                         userUpdateDto.getId())));
         existingUser.setEmail(userUpdateDto.getEmail());
         existingUser.setApiKeySlots(userUpdateDto.getApiKeySlots());

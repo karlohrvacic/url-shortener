@@ -1,6 +1,6 @@
 package cc.hrva.urlshortener.controller;
 
-import cc.hrva.urlshortener.service.AuthService;
+import cc.hrva.urlshortener.security.ClientIpResolver;
 import cc.hrva.urlshortener.service.UrlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,17 +26,17 @@ class UrlRedirectControllerTest {
     private UrlService urlService;
 
     @Mock
-    private AuthService authService;
+    private ClientIpResolver clientIpResolver;
 
     @BeforeEach
     void setUp() {
-        this.mockMvc = MockMvcBuilders.standaloneSetup(new UrlRedirectController(urlService, authService, null)).build();
+        this.mockMvc = MockMvcBuilders.standaloneSetup(new UrlRedirectController(urlService, clientIpResolver, null)).build();
     }
 
     @Test
     void shouldRedirectToLongUrl() throws Exception {
         final var redirectView = new RedirectView("https://example.com");
-        when(authService.getClientIP(any())).thenReturn("127.0.0.1");
+        when(clientIpResolver.getClientIp(any())).thenReturn("127.0.0.1");
         when(urlService.redirectResultUrl("short", "127.0.0.1")).thenReturn(redirectView);
 
         mockMvc.perform(get("/short"))

@@ -12,18 +12,23 @@ spring:
     name: URL Shortener
   mail:
     host: localhost
-    port: 8025
+    port: 1025
     username:
     password:
     properties:
       mail.smtp.auth:
+  data:
+    redis:
+      host: localhost
+  config:
+    import: optional:application-oauth.yaml
 
 app:
   jwt-base64-secret: MzMzYjg3YTRmYmU0YmM4YzJkZWE4NTJlZGEzMDgzZjkzOWNjM2MwMWQ4NzI2MjgwZWU0MzM5ZTY0MGEzMjg1YzIwMjU1MWM5ZTNkMzg5YWNiMjExNGJlMTE4NjZlMWMxODIxNjYwMTBkZTRiZWRlNzU3MDc5ZThhMDcxMjlkMGE
   email-sender-address: no-reply@hrva.cc
   contact-email: info@localhost
   server-url: localhost
-  frontend-url: http://localhost:4200
+  frontend-url: http://localhost:3000
   anonymous-url-creation-enabled: false
 
 server:

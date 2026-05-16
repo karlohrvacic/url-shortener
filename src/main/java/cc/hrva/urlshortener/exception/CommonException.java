@@ -1,12 +1,17 @@
 package cc.hrva.urlshortener.exception;
 
-import lombok.AllArgsConstructor;
-
-@AllArgsConstructor
 public abstract class CommonException extends RuntimeException {
+
+    protected CommonException() {
+        super();
+    }
 
     protected CommonException(final String message) {
         super(message);
+    }
+
+    protected CommonException(final String message, final Throwable cause) {
+        super(message, cause);
     }
 
 }

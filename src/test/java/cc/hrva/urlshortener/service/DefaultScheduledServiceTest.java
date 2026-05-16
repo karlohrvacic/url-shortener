@@ -29,32 +29,25 @@ class DefaultScheduledServiceTest {
     @Mock
     private ResetTokenService resetTokenService;
 
+    @Mock
+    private UrlNotificationService urlNotificationService;
+
     @BeforeEach
     void setUp() {
-        this.scheduledService = new DefaultScheduledService(urlService, userService, apiKeyService, ipAddressService, resetTokenService);
+        this.scheduledService = new DefaultScheduledService(urlService, userService, apiKeyService, ipAddressService, resetTokenService, urlNotificationService);
     }
 
     @Test
-    void shouldDeactivateDeprecatedIps() {
-        scheduledService.deactivateDeprecatedIps();
+    void shouldCleanupIpAddresses() {
+        scheduledService.cleanupIpAddresses();
         verify(ipAddressService).deactivateDeprecatedIps();
-    }
-
-    @Test
-    void shouldDeleteDeactivatedIps() {
-        scheduledService.deleteDeactivatedIps();
         verify(ipAddressService).deleteDeactivatedIps();
     }
 
     @Test
-    void shouldDeactivateExpiredPasswordResetTokens() {
-        scheduledService.deactivateExpiredPasswordResetTokens();
+    void shouldCleanupExpiredPasswordResetTokens() {
+        scheduledService.cleanupExpiredPasswordResetTokens();
         verify(resetTokenService).deactivateExpiredPasswordResetTokens();
-    }
-
-    @Test
-    void shouldDeleteExpiredPasswordResetTokens() {
-        scheduledService.deleteExpiredPasswordResetTokens();
         verify(resetTokenService).deleteExpiredPasswordResetTokens();
     }
 
@@ -74,5 +67,11 @@ class DefaultScheduledServiceTest {
     void shouldDeactivateExpiredUrls() {
         scheduledService.deactivateExpiredUrls();
         verify(urlService).deactivateExpiredUrls();
+    }
+
+    @Test
+    void shouldNotifyExpiringUrls() {
+        scheduledService.notifyExpiringUrls();
+        verify(urlNotificationService).notifyExpiringUrls();
     }
 }

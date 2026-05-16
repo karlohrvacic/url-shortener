@@ -1,4 +1,4 @@
-package cc.hrva.urlshortener.beans;
+package cc.hrva.urlshortener.client;
 
 import cc.hrva.urlshortener.configuration.properties.GoogleApiProperties;
 import com.google.api.services.safebrowsing.v5.Safebrowsing;
@@ -15,14 +15,10 @@ public class GoogleSafeBrowsingApi {
 
     private final GoogleApiProperties googleApiProperties;
 
-    public Safebrowsing.Urls.Search createUrlSearchRequest(final Safebrowsing safebrowsing, final List<String> urls) {
-        try {
-            return safebrowsing.urls()
-                    .search()
-                    .setUrls(urls);
-        } catch (final IOException exception) {
-            throw new RuntimeException("Failed to create Safe Browsing search request", exception);
-        }
+    public Safebrowsing.Urls.Search createUrlSearchRequest(final Safebrowsing safebrowsing, final List<String> urls) throws IOException {
+        return safebrowsing.urls()
+                .search()
+                .setUrls(urls);
     }
 
     public GoogleSecuritySafebrowsingV5SearchUrlsResponse executeSearch(final Safebrowsing.Urls.Search search) throws IOException {

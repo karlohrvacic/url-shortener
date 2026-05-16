@@ -4,7 +4,7 @@ import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.repository.IPAddressRepository;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.apachecommons.CommonsLog;
+import lombok.extern.slf4j.Slf4j;
 import cc.hrva.urlshortener.model.IPAddress;
 import cc.hrva.urlshortener.model.Url;
 import cc.hrva.urlshortener.service.IPAddressService;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@CommonsLog
+@Slf4j
 @RequiredArgsConstructor
 public class DefaultIPAddressService implements IPAddressService {
 
@@ -51,13 +51,13 @@ public class DefaultIPAddressService implements IPAddressService {
                 LocalDateTime.now().minusHours(appProperties.getInactiveVisitIncrementPerIpInHours())).stream()
                 .map(ipAddress -> {
                     ipAddress.setActive(false);
-                    log.info(String.format("Deactivated IP address with id %d", ipAddress.getId()));
+                    log.info("Deactivated IP address with id {}", ipAddress.getId());
                     return ipAddress;
                 })
                 .toList();
 
         ipAddressRepository.saveAll(ipAddresses);
-        if (!ipAddresses.isEmpty()) log.info(String.format("Deactivated %d IP addresses", ipAddresses.size()));
+        if (!ipAddresses.isEmpty()) log.info("Deactivated {} IP addresses", ipAddresses.size());
     }
 
     @Override
@@ -71,7 +71,7 @@ public class DefaultIPAddressService implements IPAddressService {
                 .toList();
 
         ipAddressRepository.deleteAll(ipAddresses);
-        if (!ipAddresses.isEmpty()) log.info(String.format("Deleted %d IP addresses", ipAddresses.size()));
+        if (!ipAddresses.isEmpty()) log.info("Deleted {} IP addresses", ipAddresses.size());
     }
 
     @Override
@@ -82,7 +82,7 @@ public class DefaultIPAddressService implements IPAddressService {
 
     private void addVisitToUrl(final IPAddress ipAddress) {
         final var savedIpAddress = ipAddressRepository.save(ipAddress.addVisit());
-        log.info(String.format("IP address with id %d saved", savedIpAddress.getId()));
+        log.info("IP address with id {} saved", savedIpAddress.getId());
     }
 
 }

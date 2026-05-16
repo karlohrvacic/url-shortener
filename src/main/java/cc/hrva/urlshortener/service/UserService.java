@@ -6,14 +6,15 @@ import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.model.User;
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface UserService {
 
     User getUserFromToken();
     User register(User user);
     UserDto fetchCurrentUser();
-    List<User> fetchAllUsers();
+    Page<User> fetchAllUsers(Pageable pageable);
     void persistUser(User user);
     void deleteUserById(Long id);
     void userHasLoggedIn(User user);

@@ -70,6 +70,10 @@ public class AppProperties {
     @Positive
     private Long maxLoginAttempts;
 
+    @NotNull
+    @Positive
+    private Long urlExpirationNotificationHours;
+
     private boolean registrationEnabled = true;
     private boolean anonymousUrlCreationEnabled = true;
 

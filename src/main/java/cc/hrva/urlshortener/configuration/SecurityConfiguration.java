@@ -1,6 +1,7 @@
 package cc.hrva.urlshortener.configuration;
 
-import cc.hrva.urlshortener.beans.JwtFilter;
+import cc.hrva.urlshortener.security.JwtFilter;
+import cc.hrva.urlshortener.security.OAuth2LoginSuccessHandler;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
@@ -36,11 +37,12 @@ public class SecurityConfiguration {
     private final JwtFilter jwtFilter;
     private final AppProperties appProperties;
     private final UserDetailsService userDetailsService;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
     @Bean
-    public AuthenticationProvider authenticationProvider() {
+    public AuthenticationProvider authenticationProvider(final PasswordEncoder passwordEncoder) {
         final var authenticationProvider = new DaoAuthenticationProvider(userDetailsService);
-        authenticationProvider.setPasswordEncoder(new BCryptPasswordEncoder());
+        authenticationProvider.setPasswordEncoder(passwordEncoder);
 
         return authenticationProvider;
     }
@@ -50,8 +52,20 @@ public class SecurityConfiguration {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
-                                .requestMatchers("/api/v1/auth/**", "/api/v1/url/**", "/**")
+                                .requestMatchers(
+                                        "/api/v1/auth/**",
+                                        "/api/v1/url/**",
+                                        "/oauth2/**",
+                                        "/login/**",
+                                        "/swagger-ui/**",
+                                        "/v3/api-docs/**",
+                                        "/"
+                                )
                                 .permitAll()
+                                .requestMatchers("/actuator/health")
+                                .permitAll()
+                                .requestMatchers("/actuator/**", "/api/v1/admin/**")
+                                .hasRole("ADMIN")
                                 .anyRequest()
                                 .authenticated()
                 ).exceptionHandling(exceptionHandling ->
@@ -65,7 +79,10 @@ public class SecurityConfiguration {
                 ).sessionManagement(sessionManagement ->
                         sessionManagement
                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                ).authenticationProvider(authenticationProvider())
+                ).authenticationProvider(authenticationProvider(passwordEncoder()))
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2LoginSuccessHandler)
+                )
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -87,7 +104,9 @@ public class SecurityConfiguration {
         final var source = new UrlBasedCorsConfigurationSource();
 
         configuration.setAllowedOrigins(List.of(appProperties.getFrontendUrl()));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
         source.registerCorsConfiguration("/**", configuration);
 
         return source;
