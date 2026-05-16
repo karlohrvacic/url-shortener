@@ -23,7 +23,7 @@ Welcome to the URL-Shortener project! This application allows you to shorten URL
 
 ## Technologies Used
 - **Backend**: Java, Spring Boot
-- **Frontend**: Angular, Angular Material, Bootstrap
+- **Frontend**: Next
 - **Database**: Postgres
 
 ## Upcoming Features Suggestions in Review

@@ -8,26 +8,29 @@ import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
+import cc.hrva.urlshortener.exception.ApiException;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
-import cc.hrva.urlshortener.exception.UserDoesntExistException;
+import cc.hrva.urlshortener.exception.UserNotFoundException;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.UserRepository;
 import cc.hrva.urlshortener.service.ResetTokenService;
 import cc.hrva.urlshortener.service.UserService;
 import cc.hrva.urlshortener.validator.AuthValidator;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.apachecommons.CommonsLog;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@CommonsLog
+@Slf4j
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class DefaultUserService implements UserService {
 
@@ -41,8 +44,10 @@ public class DefaultUserService implements UserService {
     private final UserUpdateDtoToUserConverter userUpdateDtoToUserConverter;
 
     @Override
+    @Transactional
     public User register(final User user) {
         final var savedUser = userRepository.save(user);
+        log.info("User registered email={}", savedUser.getEmail());
         sendingEmailService.sendWelcomeEmail(savedUser);
 
         return savedUser;
@@ -64,33 +69,48 @@ public class DefaultUserService implements UserService {
 
     @Override
     public User fetchUserFromEmail(final String email) {
+        log.info("User login email={}", email);
+
         final var user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserDoesntExistException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         if (Boolean.FALSE.equals(user.getActive()))
-            throw new UserDoesntExistException("User is inactive, please contact administrator");
+            throw new UserNotFoundException("User is inactive, please contact administrator");
 
         return user;
     }
 
     @Override
+    @Transactional
     public void persistUser(final User user) {
         userRepository.save(user);
     }
 
     @Override
-    public List<User> fetchAllUsers() {
-        return userRepository.findAll();
+    public Page<User> fetchAllUsers(final Pageable pageable) {
+        return userRepository.findAll(pageable);
     }
 
     @Override
+    @Transactional
     public void deleteUserById(final Long id) {
+        log.info("Delete user id={}", id);
         userRepository.deleteById(id);
     }
 
     @Override
     @Transactional
     public User updateUser(final UserUpdateDto userUpdateDto) {
+        log.info("Update user id={}", userUpdateDto.getId());
+
+        final var existingUser = userRepository.findById(userUpdateDto.getId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        if (existingUser.getAuthProvider() != null && !"local".equals(existingUser.getAuthProvider())
+                && userUpdateDto.getEmail() != null && !userUpdateDto.getEmail().equals(existingUser.getEmail())) {
+            throw new ApiException("Email cannot be changed for " + existingUser.getAuthProvider() + " accounts");
+        }
+
         return userRepository.save(Objects.requireNonNull(userUpdateDtoToUserConverter.convert(userUpdateDto)));
     }
 
@@ -100,6 +120,7 @@ public class DefaultUserService implements UserService {
         final var user = getUserFromToken();
         authValidator.passwordMatchesCurrentPassword(user, updatePasswordDto.getOldPassword());
         user.setPassword(passwordEncoder.encode(updatePasswordDto.getNewPassword()));
+        log.info("Password changed for user id={}", user.getId());
 
         return userRepository.save(user);
     }
@@ -107,6 +128,8 @@ public class DefaultUserService implements UserService {
     @Override
     @Transactional
     public void sendPasswordResetLinkToUser(final RequestPasswordResetDto requestPasswordResetDto) {
+        log.info("Password reset requested email={}", requestPasswordResetDto.getEmail());
+
         final var user = userRepository.findByEmail(requestPasswordResetDto.getEmail());
 
         if (user.isPresent()) {
@@ -118,6 +141,8 @@ public class DefaultUserService implements UserService {
     @Override
     @Transactional
     public User resetPassword(final PasswordResetDto passwordResetDto) {
+        log.info("Password reset for user email={}", passwordResetDto.getEmail());
+
         final var user = userRepository.findByEmail(passwordResetDto.getEmail())
                 .orElseThrow(() -> new NoAuthorizationException("Invalid credentials"));
 
@@ -134,6 +159,7 @@ public class DefaultUserService implements UserService {
     }
 
     @Override
+    @Transactional
     public void deactivateUnusedUserAccounts() {
         final var users = userRepository.findByLastLoginIsLessThanEqualAndActiveTrue(LocalDateTime.now()
                 .minusDays(appProperties.getDeactivateUserAccountAfterDays())).stream()
@@ -141,10 +167,11 @@ public class DefaultUserService implements UserService {
                 .toList();
 
         userRepository.saveAll(users);
-        if (!users.isEmpty())log.info(String.format("Deactivated %d users", users.size()));
+        if (!users.isEmpty()) log.info("Deactivated {} users", users.size());
     }
 
     @Override
+    @Transactional
     public void userHasLoggedIn(final User user) {
         user.userLoggedIn();
         persistUser(user);
@@ -152,7 +179,7 @@ public class DefaultUserService implements UserService {
 
     private User deactivateUser(final User user) {
         user.setActive(false);
-        log.info(String.format("Deactivated user with id %d", user.getId()));
+        log.info("Deactivated user with id {}", user.getId());
 
         return user;
     }

@@ -6,7 +6,7 @@ import cc.hrva.urlshortener.repository.ResetTokenRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.apachecommons.CommonsLog;
+import lombok.extern.slf4j.Slf4j;
 import cc.hrva.urlshortener.model.ResetToken;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.service.ResetTokenService;
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@CommonsLog
+@Slf4j
 @RequiredArgsConstructor
 public class DefaultResetTokenService implements ResetTokenService {
 
@@ -37,7 +37,7 @@ public class DefaultResetTokenService implements ResetTokenService {
                 LocalDateTime.now().minusHours(appProperties.getIpRetentionDurationInHours()));
 
         resetTokenRepository.deleteAll(resetTokens);
-        if (!resetTokens.isEmpty()) log.info(String.format("Deleted %d reset tokens", resetTokens.size()));
+        if (!resetTokens.isEmpty()) log.info("Deleted {} reset tokens", resetTokens.size());
     }
 
     @Override
@@ -70,7 +70,7 @@ public class DefaultResetTokenService implements ResetTokenService {
                 .toList();
 
         resetTokenRepository.saveAll(resetTokens);
-        if (!resetTokens.isEmpty()) log.info(String.format("Deactivated %d reset tokens", resetTokens.size()));
+        if (!resetTokens.isEmpty()) log.info("Deactivated {} reset tokens", resetTokens.size());
     }
 
 }

@@ -39,7 +39,6 @@ class UserRegisterDtoToUserConverterTest {
     void shouldConvertUserRegisterDtoToUser() {
         final var authority = Authorities.builder().id(1L).name("ROLE_USER").build();
         final var registerDto = UserRegisterDto.builder()
-                .name("Test User")
                 .email("test@example.com")
                 .password("password123")
                 .build();

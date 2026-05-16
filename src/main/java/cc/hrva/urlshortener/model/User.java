@@ -55,6 +55,8 @@ public class User {
 
     private Boolean active;
 
+    private String authProvider;
+
     @PrePersist
     public void onCreate() {
         this.createDate = LocalDateTime.now();

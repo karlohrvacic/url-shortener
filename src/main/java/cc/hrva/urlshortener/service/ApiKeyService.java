@@ -1,21 +1,24 @@
 package cc.hrva.urlshortener.service;
 
 import java.util.List;
+import cc.hrva.urlshortener.dto.ApiKeyResponse;
 import cc.hrva.urlshortener.dto.ApiKeyUpdateDto;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface ApiKeyService {
 
     void deactivateExpired();
-    ApiKey generateNewApiKey();
-    ApiKey revokeApiKey(Long id);
-    List<ApiKey> fetchMyApiKeys();
-    List<ApiKey> fetchAllApiKeys();
+    ApiKeyResponse generateNewApiKey();
+    ApiKeyResponse revokeApiKey(Long id);
+    List<ApiKeyResponse> fetchMyApiKeys();
+    Page<ApiKeyResponse> fetchAllApiKeys(Pageable pageable);
     ApiKey findApiKeyByKey(String key);
     ApiKey fetchApiKeyByKey(String key);
     ApiKey apiKeyUseAction(ApiKey apiKey);
     int getActiveApiKeysCountForUser(User user);
-    ApiKey updateKey(ApiKeyUpdateDto apiKeyUpdateDto);
+    ApiKeyResponse updateKey(ApiKeyUpdateDto apiKeyUpdateDto);
 
 }

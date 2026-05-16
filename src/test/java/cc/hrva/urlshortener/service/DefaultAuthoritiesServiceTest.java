@@ -1,7 +1,7 @@
 package cc.hrva.urlshortener.service;
 
 import java.util.Optional;
-import cc.hrva.urlshortener.exception.UserDoesntExistException;
+import cc.hrva.urlshortener.exception.UserNotFoundException;
 import cc.hrva.urlshortener.model.codebook.Authorities;
 import cc.hrva.urlshortener.repository.AuthoritiesRepository;
 import cc.hrva.urlshortener.service.impl.DefaultAuthoritiesService;
@@ -54,7 +54,7 @@ class DefaultAuthoritiesServiceTest {
         when(authoritiesRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authoritiesService.getDefaultAuthority())
-                .isInstanceOf(UserDoesntExistException.class)
+                .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("Authority not found");
     }
 }

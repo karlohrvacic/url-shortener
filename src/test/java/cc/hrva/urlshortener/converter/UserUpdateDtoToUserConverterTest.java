@@ -2,7 +2,7 @@ package cc.hrva.urlshortener.converter;
 
 import java.util.Optional;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
-import cc.hrva.urlshortener.exception.UserDoesntExistException;
+import cc.hrva.urlshortener.exception.UserNotFoundException;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +46,7 @@ class UserUpdateDtoToUserConverterTest {
         when(userRepository.findById(anyLong())).thenReturn(Optional.empty());
 
         assertThatCode(() -> converter.convert(userUpdateDto))
-                .isInstanceOf(UserDoesntExistException.class)
+                .isInstanceOf(UserNotFoundException.class)
                 .hasMessage(String.format("User with ID %d has not been found", userUpdateDto.getId()));
     }
 }

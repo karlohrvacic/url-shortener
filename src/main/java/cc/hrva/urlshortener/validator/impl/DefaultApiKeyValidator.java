@@ -4,8 +4,8 @@ import cc.hrva.urlshortener.repository.ApiKeyRepository;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import cc.hrva.urlshortener.exception.ApiKeyDoesntExistException;
-import cc.hrva.urlshortener.exception.ApiKeyIsNotValid;
+import cc.hrva.urlshortener.exception.ApiKeyNotFoundException;
+import cc.hrva.urlshortener.exception.InvalidApiKeyException;
 import cc.hrva.urlshortener.exception.ApiKeySlotException;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.model.ApiKey;
@@ -24,20 +24,20 @@ public class DefaultApiKeyValidator implements ApiKeyValidator {
     @Override
     public void apiKeyExistsByKeyAndIsValid(final String key) {
         final var apiKey = apiKeyRepository.findApiKeyByKey(key)
-                .orElseThrow(() -> new ApiKeyDoesntExistException("API key doesn't exist"));
+                .orElseThrow(() -> new ApiKeyNotFoundException("API key doesn't exist"));
 
         if (apiKey.getApiCallsUsed() >= Optional.ofNullable(apiKey.getApiCallsLimit())
                 .orElse(apiKey.getApiCallsUsed()) + 1) {
-            throw new ApiKeyIsNotValid("API key exceeded call limit");
+            throw new InvalidApiKeyException("API key exceeded call limit");
         }
 
         if (LocalDateTime.now().isAfter(Optional.ofNullable(apiKey.getExpirationDate())
                 .orElse(LocalDateTime.now().plusDays(1)))) {
-            throw new ApiKeyIsNotValid("API key exceeded expiration date");
+            throw new InvalidApiKeyException("API key exceeded expiration date");
         }
 
         if (!apiKey.isActive()) {
-            throw new ApiKeyIsNotValid("API key is invalid");
+            throw new InvalidApiKeyException("API key is invalid");
         }
     }
 

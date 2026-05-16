@@ -60,7 +60,7 @@ class AuthControllerTest {
 
     @Test
     void shouldRequestPasswordReset() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/reset-password")
+        mockMvc.perform(post("/api/v1/auth/password-reset")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(RequestPasswordResetDto.builder().email("test@example.com").build())))
                 .andExpect(status().isAccepted());
@@ -73,7 +73,7 @@ class AuthControllerTest {
         final var user = User.builder().id(1L).email("test@example.com").build();
         when(userService.resetPassword(any(PasswordResetDto.class))).thenReturn(user);
 
-        mockMvc.perform(post("/api/v1/auth/reset-password/set-password")
+        mockMvc.perform(post("/api/v1/auth/password-reset/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(PasswordResetDto.builder().email("test@example.com").token("token").password("newPassword").build())))
                 .andExpect(status().isOk())

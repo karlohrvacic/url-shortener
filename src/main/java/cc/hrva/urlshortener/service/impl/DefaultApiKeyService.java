@@ -2,14 +2,17 @@ package cc.hrva.urlshortener.service.impl;
 
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.converter.ApiKeyUpdateDtoToApiKeyConverter;
-import cc.hrva.urlshortener.exception.ApiKeyDoesntExistException;
+import cc.hrva.urlshortener.exception.ApiKeyNotFoundException;
 import cc.hrva.urlshortener.repository.ApiKeyRepository;
 import cc.hrva.urlshortener.validator.ApiKeyValidator;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.apachecommons.CommonsLog;
+import lombok.extern.slf4j.Slf4j;
+import cc.hrva.urlshortener.dto.ApiKeyResponse;
 import cc.hrva.urlshortener.dto.ApiKeyUpdateDto;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.User;
@@ -19,7 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@CommonsLog
+@Slf4j
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class DefaultApiKeyService implements ApiKeyService {
 
@@ -31,28 +35,33 @@ public class DefaultApiKeyService implements ApiKeyService {
 
     @Override
     @Transactional
-    public ApiKey generateNewApiKey() {
+    public ApiKeyResponse generateNewApiKey() {
         final var user = userService.getUserFromToken();
+        log.info("Generated new API key for user email={}", user.getEmail());
 
         apiKeyValidator.apiKeySlotsAvailable(user);
 
-        return apiKeyRepository.save(new ApiKey(user, appProperties));
+        return ApiKeyResponse.from(apiKeyRepository.save(new ApiKey(user, appProperties)));
     }
 
     @Override
-    public List<ApiKey> fetchMyApiKeys() {
-        return userService.getUserFromToken().getApiKeys();
+    public List<ApiKeyResponse> fetchMyApiKeys() {
+        return userService.getUserFromToken().getApiKeys().stream()
+                .map(ApiKeyResponse::from)
+                .toList();
     }
 
     @Override
     @Transactional
-    public ApiKey revokeApiKey(final Long id) {
+    public ApiKeyResponse revokeApiKey(final Long id) {
+        log.info("Revoked API key id={}", id);
+
         final var apiKey = apiKeyRepository.findById(id)
-                .orElseThrow(() -> new ApiKeyDoesntExistException("Api key doesn't exist"));
+                .orElseThrow(() -> new ApiKeyNotFoundException("Api key doesn't exist"));
 
         apiKeyValidator.verifyUserAdminOrOwner(apiKey);
         apiKey.setActive(false);
-        return apiKeyRepository.save(apiKey);
+        return ApiKeyResponse.from(apiKeyRepository.save(apiKey));
     }
 
     @Override
@@ -64,28 +73,30 @@ public class DefaultApiKeyService implements ApiKeyService {
     @Override
     public ApiKey fetchApiKeyByKey(final String key) {
         return apiKeyRepository.findApiKeyByKey(key)
-                .orElseThrow(() -> new ApiKeyDoesntExistException("Sent API key doesn't exist"));
+                .orElseThrow(() -> new ApiKeyNotFoundException("Sent API key doesn't exist"));
     }
 
     @Override
-    public List<ApiKey> fetchAllApiKeys() {
-        return apiKeyRepository.findAll();
+    public Page<ApiKeyResponse> fetchAllApiKeys(final Pageable pageable) {
+        return apiKeyRepository.findAll(pageable).map(ApiKeyResponse::from);
     }
 
     @Override
     @Transactional
-    public ApiKey updateKey(final ApiKeyUpdateDto apiKeyUpdateDto) {
-        return apiKeyRepository.save(Objects.requireNonNull(apiKeyConverter.convert(apiKeyUpdateDto)));
+    public ApiKeyResponse updateKey(final ApiKeyUpdateDto apiKeyUpdateDto) {
+        log.info("Updated API key id={}", apiKeyUpdateDto.getId());
+        return ApiKeyResponse.from(apiKeyRepository.save(Objects.requireNonNull(apiKeyConverter.convert(apiKeyUpdateDto))));
     }
 
     @Override
+    @Transactional
     public void deactivateExpired() {
         final var apiKeys = apiKeyRepository.findByExpirationDateIsLessThanEqualAndActiveTrue(LocalDateTime.now()).stream()
                 .map(ApiKey::deactivate)
                 .toList();
 
         apiKeyRepository.saveAll(apiKeys);
-        if (!apiKeys.isEmpty()) log.info(String.format("Deactivated %d api keys", apiKeys.size()));
+        if (!apiKeys.isEmpty()) log.info("Deactivated {} api keys", apiKeys.size());
     }
 
     @Override
@@ -96,7 +107,7 @@ public class DefaultApiKeyService implements ApiKeyService {
     @Override
     public ApiKey findApiKeyByKey(final String key) {
         return apiKeyRepository.findApiKeyByKey(key)
-            .orElseThrow(() -> new ApiKeyDoesntExistException("API key doesn't exist"));
+            .orElseThrow(() -> new ApiKeyNotFoundException("API key doesn't exist"));
     }
 
 }

@@ -11,7 +11,7 @@ import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
-import cc.hrva.urlshortener.exception.UserDoesntExistException;
+import cc.hrva.urlshortener.exception.UserNotFoundException;
 import cc.hrva.urlshortener.model.ResetToken;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.UserRepository;
@@ -32,6 +32,9 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -128,16 +131,17 @@ class DefaultUserServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> userService.fetchUserFromEmail("test@example.com"))
-                .isInstanceOf(UserDoesntExistException.class)
+                .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("User is inactive, please contact administrator");
     }
 
     @Test
     void shouldFetchAllUsers() {
-        final var users = Collections.singletonList(User.builder().id(1L).build());
-        when(userRepository.findAll()).thenReturn(users);
+        final var pageable = PageRequest.of(0, 20);
+        final var users = new PageImpl<>(Collections.singletonList(User.builder().id(1L).build()));
+        when(userRepository.findAll(pageable)).thenReturn(users);
 
-        assertThat(userService.fetchAllUsers()).isEqualTo(users);
+        assertThat(userService.fetchAllUsers(pageable)).isEqualTo(users);
     }
 
     @Test
@@ -149,8 +153,10 @@ class DefaultUserServiceTest {
     @Test
     void shouldUpdateUser() {
         final var updateDto = UserUpdateDto.builder().id(1L).build();
+        final var existingUser = User.builder().id(1L).authProvider("local").build();
         final var user = User.builder().id(1L).build();
 
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
         when(userUpdateDtoToUserConverter.convert(updateDto)).thenReturn(user);
         when(userRepository.save(user)).thenReturn(user);
 

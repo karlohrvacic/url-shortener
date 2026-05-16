@@ -5,13 +5,18 @@ import cc.hrva.urlshortener.dto.UserDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,22 +25,27 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("api/v1/user")
+@RequestMapping("api/v1/users")
 public class UserController {
 
     private final UserService userService;
 
+    @Operation(summary = "Get current user", description = "Retrieve details of the currently authenticated user.")
     @GetMapping("/me")
     public ResponseEntity<UserDto> currentUser() {
         return ResponseEntity.ok(userService.fetchCurrentUser());
     }
 
-    @GetMapping("/all")
+    @Operation(summary = "Get all users (admin)", description = "Retrieve paginated list of all users. Requires ROLE_ADMIN.")
+    @GetMapping
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<List<User>> fetchAllUsers() {
-        return ResponseEntity.ok(userService.fetchAllUsers());
+    public ResponseEntity<Page<User>> fetchAllUsers(
+            @PageableDefault(size = 20) final Pageable pageable) {
+        return ResponseEntity.ok(userService.fetchAllUsers(pageable));
     }
 
+    @Operation(summary = "Delete a user (admin)", description = "Permanently delete a user by ID. Requires ROLE_ADMIN.")
+    @ApiResponse(responseCode = "404", description = "User not found")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable("id") final Long id) {
@@ -44,15 +54,23 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping()
+    @Operation(summary = "Update a user (admin)", description = "Update user details (email, slots, active status). Requires ROLE_ADMIN.")
+    @ApiResponse(responseCode = "400", description = "Validation error or bad request")
+    @ApiResponse(responseCode = "404", description = "User not found")
+    @PutMapping("/{id}")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<User> updateUser(@Valid @RequestBody final UserUpdateDto userUpdateDto) {
+    public ResponseEntity<User> updateUser(
+            @PathVariable final Long id,
+            @Valid @RequestBody final UserUpdateDto userUpdateDto) {
+        userUpdateDto.setId(id);
         return ResponseEntity.ok(userService.updateUser(userUpdateDto));
     }
 
-    @PutMapping("/update-password")
+    @Operation(summary = "Update password", description = "Update the password for the authenticated user.")
+    @ApiResponse(responseCode = "400", description = "Validation error or bad request")
+    @PatchMapping("/password")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_USER')")
-    public ResponseEntity<User> setPassword(@Valid @RequestBody final UpdatePasswordDto updatePasswordDto) {
+    public ResponseEntity<User> updatePassword(@Valid @RequestBody final UpdatePasswordDto updatePasswordDto) {
         return ResponseEntity.ok(userService.updatePassword(updatePasswordDto));
     }
 

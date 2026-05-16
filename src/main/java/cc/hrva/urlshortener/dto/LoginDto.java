@@ -1,5 +1,6 @@
 package cc.hrva.urlshortener.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,9 +12,14 @@ import lombok.Data;
 public class LoginDto {
 
     @NotBlank(message = "Email is required")
+    @Schema(description = "User email address", example = "user@example.com")
     private String email;
 
     @NotBlank(message = "Password is required")
+    @Schema(description = "User password", example = "securePassword123")
     private String password;
+
+    @Schema(description = "Whether to remember the user across sessions", example = "false")
+    private Boolean rememberMe;
 
 }

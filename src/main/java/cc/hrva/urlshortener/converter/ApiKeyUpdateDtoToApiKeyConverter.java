@@ -1,6 +1,6 @@
 package cc.hrva.urlshortener.converter;
 
-import cc.hrva.urlshortener.exception.ApiKeyDoesntExistException;
+import cc.hrva.urlshortener.exception.ApiKeyNotFoundException;
 import cc.hrva.urlshortener.repository.ApiKeyRepository;
 import lombok.RequiredArgsConstructor;
 import cc.hrva.urlshortener.dto.ApiKeyUpdateDto;
@@ -17,7 +17,7 @@ public class ApiKeyUpdateDtoToApiKeyConverter implements Converter<ApiKeyUpdateD
     @Override
     public ApiKey convert(final ApiKeyUpdateDto apiKeyUpdateDto) {
         final var existingApiKey = apiKeyRepository.findById(apiKeyUpdateDto.getId())
-                .orElseThrow(() -> new ApiKeyDoesntExistException(String.format("API key with ID %d has not been found",
+                .orElseThrow(() -> new ApiKeyNotFoundException(String.format("API key with ID %d has not been found",
                         apiKeyUpdateDto.getId())));
         existingApiKey.setApiCallsLimit(apiKeyUpdateDto.getApiCallsLimit());
         existingApiKey.setApiCallsUsed(apiKeyUpdateDto.getApiCallsUsed());

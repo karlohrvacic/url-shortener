@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <changeSet author="khrvacic" id="user-account-auth-provider">
+        <addColumn tableName="USER_ACCOUNT">
+            <column name="AUTH_PROVIDER" type="VARCHAR(20)" defaultValue="local">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="USER_ACCOUNT" columnName="AUTH_PROVIDER"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

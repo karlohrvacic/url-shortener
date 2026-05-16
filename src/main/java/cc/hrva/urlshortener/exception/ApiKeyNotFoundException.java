@@ -3,10 +3,10 @@ package cc.hrva.urlshortener.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-@ResponseStatus(HttpStatus.BAD_REQUEST)
-public class ApiKeyIsNotValid extends CommonException {
+@ResponseStatus(HttpStatus.NOT_FOUND)
+public class ApiKeyNotFoundException extends CommonException {
 
-    public ApiKeyIsNotValid(final String message) {
+    public ApiKeyNotFoundException(final String message) {
         super(message);
     }
 

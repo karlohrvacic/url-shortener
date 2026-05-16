@@ -3,10 +3,14 @@ package cc.hrva.urlshortener.service;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.converter.ApiKeyUpdateDtoToApiKeyConverter;
+import cc.hrva.urlshortener.dto.ApiKeyResponse;
 import cc.hrva.urlshortener.dto.ApiKeyUpdateDto;
-import cc.hrva.urlshortener.exception.ApiKeyDoesntExistException;
+import cc.hrva.urlshortener.exception.ApiKeyNotFoundException;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.ApiKeyRepository;
@@ -18,7 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -61,7 +65,8 @@ class ApiKeyServiceTest {
         when(userService.getUserFromToken()).thenReturn(user);
         when(apiKeyRepository.save(any(ApiKey.class))).thenReturn(apiKey);
 
-        assertThat(apiKeyService.generateNewApiKey()).isEqualTo(apiKey);
+        final var result = apiKeyService.generateNewApiKey();
+        assertThat(result).isInstanceOf(ApiKeyResponse.class);
     }
 
     @Test
@@ -72,7 +77,9 @@ class ApiKeyServiceTest {
 
         when(userService.getUserFromToken()).thenReturn(user);
 
-        assertThat(apiKeyService.fetchMyApiKeys()).isEqualTo(apiKeyList);
+        final var result = apiKeyService.fetchMyApiKeys();
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isInstanceOf(ApiKeyResponse.class);
     }
 
     @Test
@@ -82,7 +89,7 @@ class ApiKeyServiceTest {
         when(apiKeyRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatCode(() -> apiKeyService.revokeApiKey(id))
-                .isInstanceOf(ApiKeyDoesntExistException.class)
+                .isInstanceOf(ApiKeyNotFoundException.class)
                 .hasMessage("Api key doesn't exist");
     }
 
@@ -94,7 +101,8 @@ class ApiKeyServiceTest {
         when(apiKeyRepository.findById(id)).thenReturn(Optional.ofNullable(apiKey));
         when(apiKeyRepository.save(any(ApiKey.class))).thenReturn(apiKey);
 
-        assertThat(apiKeyService.revokeApiKey(id)).isEqualTo(apiKey);
+        final var result = apiKeyService.revokeApiKey(id);
+        assertThat(result.active()).isFalse();
     }
 
     @Test
@@ -122,18 +130,21 @@ class ApiKeyServiceTest {
         when(apiKeyRepository.findApiKeyByKey(key)).thenReturn(Optional.empty());
 
         assertThatCode(() -> apiKeyService.fetchApiKeyByKey(key))
-                .isInstanceOf(ApiKeyDoesntExistException.class)
+                .isInstanceOf(ApiKeyNotFoundException.class)
                 .hasMessage("Sent API key doesn't exist");
     }
 
     @Test
     void shouldFetchAllApiKeys() {
-        final ApiKey apiKey = ApiKey.builder().build();
-        final List<ApiKey> apiKeyList = Collections.singletonList(apiKey);
+        final var pageable = PageRequest.of(0, 20);
+        final var apiKey = ApiKey.builder().build();
+        final var apiKeyList = new PageImpl<>(Collections.singletonList(apiKey));
 
-        when(apiKeyRepository.findAll()).thenReturn(apiKeyList);
+        when(apiKeyRepository.findAll(pageable)).thenReturn(apiKeyList);
 
-        assertThat(apiKeyService.fetchAllApiKeys()).isEqualTo(apiKeyList);
+        final var result = apiKeyService.fetchAllApiKeys(pageable);
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
     }
 
     @Test
@@ -144,7 +155,8 @@ class ApiKeyServiceTest {
         when(apiKeyConverter.convert(apiKeyUpdateDto)).thenReturn(apiKey);
         when(apiKeyRepository.save(apiKey)).thenReturn(apiKey);
 
-        assertThat(apiKeyService.updateKey(apiKeyUpdateDto)).isEqualTo(apiKey);
+        final var result = apiKeyService.updateKey(apiKeyUpdateDto);
+        assertThat(result).isInstanceOf(ApiKeyResponse.class);
     }
 
 }

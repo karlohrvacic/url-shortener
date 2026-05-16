@@ -2,11 +2,15 @@ package cc.hrva.urlshortener.service;
 
 import java.util.Collections;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.converter.CreateUrlToUrlConverter;
 import cc.hrva.urlshortener.converter.UrlToPeekUrlConverter;
 import cc.hrva.urlshortener.converter.UrlUpdateDtoToUrlConverter;
 import cc.hrva.urlshortener.dto.CreateUrlDto;
+import cc.hrva.urlshortener.dto.UrlResponse;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.Url;
 import cc.hrva.urlshortener.model.User;
@@ -21,7 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.task.TaskExecutor;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -90,7 +94,8 @@ class UrlServiceTest {
         when(urlRepository.save(url)).thenReturn(url);
         when(createUrlToUrlConverter.convert(createUrlDto)).thenReturn(url);
 
-        assertThat(urlService.saveUrlRouting(createUrlDto)).isEqualTo(url);
+        final var result = urlService.saveUrlRouting(createUrlDto);
+        assertThat(result.longUrl()).isEqualTo("long");
 
         verify(urlValidator).checkIfShortUrlIsUnique(url.getShortUrl());
         verify(urlValidator).longUrlInUrl(url);
@@ -107,7 +112,9 @@ class UrlServiceTest {
         when(urlRepository.existsUrlByLongUrlAndActiveTrueAndOwnerIsNull(url.getLongUrl())).thenReturn(true);
         when(urlRepository.findByLongUrlAndActiveTrue(url.getLongUrl())).thenReturn(Optional.ofNullable(existingLongUrl));
 
-        assertThat(urlService.saveUrlRouting(createUrlDto)).isEqualTo(existingLongUrl);
+        final var result = urlService.saveUrlRouting(createUrlDto);
+        assertThat(result.longUrl()).isEqualTo("long");
+        assertThat(result.active()).isTrue();
     }
 
     @Test
@@ -121,7 +128,8 @@ class UrlServiceTest {
         when(apiKeyService.fetchApiKeyByKey(api)).thenReturn(apiKey);
         when(createUrlToUrlConverter.convert(createUrlDto)).thenReturn(url);
 
-        assertThat(urlService.saveUrlWithApiKey(createUrlDto, api)).isEqualTo(url);
+        final var result = urlService.saveUrlWithApiKey(createUrlDto, api);
+        assertThat(result).isInstanceOf(UrlResponse.class);
 
         verify(apiKeyValidator).apiKeyExistsByKeyAndIsValid(api);
         verify(apiKeyService).apiKeyUseAction(any(ApiKey.class));
@@ -132,12 +140,16 @@ class UrlServiceTest {
         final var apiKey = "apikey";
         final var user = User.builder().build();
         final var key = ApiKey.builder().owner(user).build();
-        final var urls = Collections.singletonList(Url.builder().build());
+        final var pageable = PageRequest.of(0, 20);
+        final var url = Url.builder().build();
+        final var urls = new PageImpl<>(Collections.singletonList(url));
 
         when(apiKeyService.fetchApiKeyByKey(apiKey)).thenReturn(key);
-        when(urlRepository.findAllByOwner(user)).thenReturn(Optional.of(urls));
+        when(urlRepository.findAllByOwner(user, pageable)).thenReturn(urls);
 
-        assertThat(urlService.getAllMyUrls(apiKey)).isEqualTo(urls);
+        final var result = urlService.getAllMyUrls(apiKey, pageable);
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
     }
 
     @Test
@@ -152,7 +164,8 @@ class UrlServiceTest {
         when(urlRepository.save(url)).thenReturn(url);
         when(appProperties.getShortUrlLength()).thenReturn(1L);
 
-        assertThat(urlService.saveUrlWithApiKey(createUrlDto, null)).isEqualTo(url);
+        final var result = urlService.saveUrlWithApiKey(createUrlDto, null);
+        assertThat(result).isInstanceOf(UrlResponse.class);
 
         verify(apiKeyValidator).apiKeyExistsByKeyAndIsValid("key");
         verify(apiKeyService).apiKeyUseAction(any(ApiKey.class));

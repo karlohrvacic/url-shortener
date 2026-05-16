@@ -1,4 +1,4 @@
-package cc.hrva.urlshortener.beans;
+package cc.hrva.urlshortener.security;
 
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import org.junit.jupiter.api.BeforeEach;

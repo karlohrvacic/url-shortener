@@ -13,6 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -22,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,7 +43,9 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
-        this.mockMvc = MockMvcBuilders.standaloneSetup(new UserController(userService)).build();
+        this.mockMvc = MockMvcBuilders.standaloneSetup(new UserController(userService))
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
+                .build();
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
@@ -48,24 +55,26 @@ class UserControllerTest {
         final var userDto = UserDto.builder().id(1L).email("test@example.com").build();
         when(userService.fetchCurrentUser()).thenReturn(userDto);
 
-        mockMvc.perform(get("/api/v1/user/me"))
+        mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("test@example.com"));
     }
 
     @Test
     void shouldGetAllUsers() throws Exception {
-        final var users = Collections.singletonList(User.builder().id(1L).email("test@example.com").build());
-        when(userService.fetchAllUsers()).thenReturn(users);
+        final var userList = Collections.singletonList(User.builder().id(1L).email("test@example.com").build());
+        final var pageable = PageRequest.of(0, 20);
+        final var users = new PageImpl<>(userList, pageable, userList.size());
+        when(userService.fetchAllUsers(any(Pageable.class))).thenReturn(users);
 
-        mockMvc.perform(get("/api/v1/user/all"))
+        mockMvc.perform(get("/api/v1/users").param("page", "0").param("size", "20"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1));
+                .andExpect(jsonPath("$.content.size()").value(1));
     }
 
     @Test
     void shouldDeleteUser() throws Exception {
-        mockMvc.perform(delete("/api/v1/user/1"))
+        mockMvc.perform(delete("/api/v1/users/1"))
                 .andExpect(status().isNoContent());
 
         verify(userService).deleteUserById(1L);
@@ -76,7 +85,7 @@ class UserControllerTest {
         final var user = User.builder().id(1L).email("test@example.com").build();
         when(userService.updateUser(any(UserUpdateDto.class))).thenReturn(user);
 
-        mockMvc.perform(put("/api/v1/user")
+        mockMvc.perform(put("/api/v1/users/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(UserUpdateDto.builder().id(1L).build())))
                 .andExpect(status().isOk())
@@ -88,7 +97,7 @@ class UserControllerTest {
         final var user = User.builder().id(1L).email("test@example.com").build();
         when(userService.updatePassword(any(UpdatePasswordDto.class))).thenReturn(user);
 
-        mockMvc.perform(put("/api/v1/user/update-password")
+        mockMvc.perform(patch("/api/v1/users/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(UpdatePasswordDto.builder().oldPassword("old").newPassword("new").build())))
                 .andExpect(status().isOk())

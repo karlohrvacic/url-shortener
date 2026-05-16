@@ -4,19 +4,41 @@ spring:
   data:
     redis:
       host: redis.hrvalabs.net
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${OAUTH2_GOOGLE_CLIENT_ID:}
+            client-secret: ${OAUTH2_GOOGLE_CLIENT_SECRET:}
+            scope: profile, email
+          github:
+            client-id: ${OAUTH2_GITHUB_CLIENT_ID:}
+            client-secret: ${OAUTH2_GITHUB_CLIENT_SECRET:}
+            scope: user:email
+  web:
+    error:
+      include-message: always
 
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,metrics,caches,env,beans
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
 
 server:
-  error:
-    include-message: always
+  forward-headers-strategy: framework
 
 app:
-  app-name: Open Url Shortener
+  app-name: hrva.cc Url Shortener
   google-api:
     client-id: hrva.cc
     client-version: 1.0.0
@@ -30,5 +52,6 @@ app:
   ip-retention-duration-in-hours: 48
   deactivate-user-account-after-days: 1825
   max-login-attempts: 20
+  url-expiration-notification-hours: 24
   registration-enabled: true
   anonymous-url-creation-enabled: false

@@ -1,4 +1,4 @@
-package cc.hrva.urlshortener.beans;
+package cc.hrva.urlshortener.security;
 
 import cc.hrva.urlshortener.exception.ApiException;
 import tools.jackson.databind.ObjectMapper;

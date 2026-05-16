@@ -8,7 +8,7 @@ import jakarta.mail.internet.MimeMessage;
 import java.io.File;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.apachecommons.CommonsLog;
+import lombok.extern.slf4j.Slf4j;
 import cc.hrva.urlshortener.model.Email;
 import cc.hrva.urlshortener.service.EmailService;
 import org.apache.commons.lang3.StringUtils;
@@ -17,7 +17,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Service
-@CommonsLog
+@Slf4j
 @RequiredArgsConstructor
 public class DefaultEmailService implements EmailService {
 

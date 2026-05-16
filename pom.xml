@@ -27,6 +27,8 @@
         <commonsIoVersion>2.22.0</commonsIoVersion>
         <googleApiClientVersion>2.9.0</googleApiClientVersion>
         <googleApiServicesSafebrowsingVersion>v5-rev20251214-2.0.0</googleApiServicesSafebrowsingVersion>
+        <zxingVersion>3.5.3</zxingVersion>
+        <jsoupVersion>1.19.1</jsoupVersion>
     </properties>
 
     <dependencies>
@@ -127,6 +129,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- OAuth2 Client -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+
         <!-- Apache Commons -->
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -143,6 +151,25 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-liquibase</artifactId>
+        </dependency>
+
+        <!-- ZXing (QR Code) -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>${zxingVersion}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>${zxingVersion}</version>
+        </dependency>
+
+        <!-- Jsoup (HTML parsing for link previews) -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>${jsoupVersion}</version>
         </dependency>
 
         <!-- Google APIs -->

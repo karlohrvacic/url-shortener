@@ -1,6 +1,6 @@
 package cc.hrva.urlshortener.exception;
 
-import cc.hrva.urlshortener.beans.LowerCaseClassNameResolver;
+import cc.hrva.urlshortener.configuration.LowerCaseClassNameResolver;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
@@ -13,7 +13,6 @@ import org.hibernate.validator.internal.engine.path.PathImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,7 +21,6 @@ import java.util.Set;
 
 @Getter
 @Setter
-@ResponseStatus(HttpStatus.BAD_REQUEST)
 @JsonTypeIdResolver(LowerCaseClassNameResolver.class)
 @JsonTypeInfo(include = JsonTypeInfo.As.WRAPPER_OBJECT, use = JsonTypeInfo.Id.CUSTOM, property = "error", visible = true)
 public class ApiException extends CommonException {

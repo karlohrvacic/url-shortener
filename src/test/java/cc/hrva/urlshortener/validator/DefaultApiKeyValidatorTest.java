@@ -3,8 +3,8 @@ package cc.hrva.urlshortener.validator;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Optional;
-import cc.hrva.urlshortener.exception.ApiKeyDoesntExistException;
-import cc.hrva.urlshortener.exception.ApiKeyIsNotValid;
+import cc.hrva.urlshortener.exception.ApiKeyNotFoundException;
+import cc.hrva.urlshortener.exception.InvalidApiKeyException;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.User;
@@ -93,7 +93,7 @@ class DefaultApiKeyValidatorTest {
         when(apiKeyRepository.findApiKeyByKey(key)).thenReturn(Optional.empty());
 
         assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
-                .isInstanceOf(ApiKeyDoesntExistException.class)
+                .isInstanceOf(ApiKeyNotFoundException.class)
                 .hasMessage("API key doesn't exist");
     }
 
@@ -105,7 +105,7 @@ class DefaultApiKeyValidatorTest {
         when(apiKeyRepository.findApiKeyByKey(key)).thenReturn(Optional.ofNullable(apiKey));
 
         assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
-                .isInstanceOf(ApiKeyIsNotValid.class)
+                .isInstanceOf(InvalidApiKeyException.class)
                 .hasMessage("API key exceeded call limit");
     }
 
@@ -117,7 +117,7 @@ class DefaultApiKeyValidatorTest {
         when(apiKeyRepository.findApiKeyByKey(key)).thenReturn(Optional.ofNullable(apiKey));
 
         assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
-                .isInstanceOf(ApiKeyIsNotValid.class)
+                .isInstanceOf(InvalidApiKeyException.class)
                 .hasMessage("API key exceeded expiration date");
     }
 
@@ -129,7 +129,7 @@ class DefaultApiKeyValidatorTest {
         when(apiKeyRepository.findApiKeyByKey(key)).thenReturn(Optional.ofNullable(apiKey));
 
         assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
-                .isInstanceOf(ApiKeyIsNotValid.class)
+                .isInstanceOf(InvalidApiKeyException.class)
                 .hasMessage("API key is invalid");
     }
 }
