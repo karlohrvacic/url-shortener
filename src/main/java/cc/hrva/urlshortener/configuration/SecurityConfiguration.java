@@ -61,7 +61,8 @@ public class SecurityConfiguration {
                                         "/login/**",
                                         "/swagger-ui/**",
                                         "/v3/api-docs/**",
-                                        "/"
+                                        "/",
+                                        "/*"
                                 )
                                 .permitAll()
                                 .requestMatchers("/actuator/health")
