@@ -3,6 +3,7 @@ package cc.hrva.urlshortener.controller;
 import java.util.Collections;
 import cc.hrva.urlshortener.dto.CreateUrlDto;
 import cc.hrva.urlshortener.dto.UrlResponse;
+import cc.hrva.urlshortener.dto.UrlSearchDto;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
 import cc.hrva.urlshortener.model.PeekUrl;
 import cc.hrva.urlshortener.model.Url;
@@ -151,7 +152,7 @@ class UrlControllerTest {
         final var urlList = Collections.singletonList(urlResponse);
         final var pageable = PageRequest.of(0, 20);
         final var urls = new PageImpl<>(urlList, pageable, urlList.size());
-        when(urlService.getAllUrls(any(Pageable.class))).thenReturn(urls);
+        when(urlService.getAllUrls(any(Pageable.class), any(UrlSearchDto.class))).thenReturn(urls);
 
         mockMvc.perform(get("/api/v1/urls/all").param("page", "0").param("size", "20"))
                 .andExpect(status().isOk())
@@ -166,6 +167,16 @@ class UrlControllerTest {
         mockMvc.perform(patch("/api/v1/urls/1/deactivate"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void shouldActivateUrl() throws Exception {
+        final var url = Url.builder().id(1L).active(true).build();
+        when(urlService.activateUrl(1L)).thenReturn(UrlResponse.from(url));
+
+        mockMvc.perform(patch("/api/v1/urls/1/activate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true));
     }
 
     @Test

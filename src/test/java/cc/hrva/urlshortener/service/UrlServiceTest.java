@@ -254,4 +254,15 @@ class UrlServiceTest {
         verify(apiKeyService).apiKeyUseAction(any(ApiKey.class));
     }
 
+    @Test
+    void shouldActivateUrl() {
+        final var url = Url.builder().id(1L).active(false).build();
+        final var activatedUrl = Url.builder().id(1L).active(true).build();
+        when(urlRepository.findById(1L)).thenReturn(Optional.of(url));
+        when(urlRepository.save(any(Url.class))).thenReturn(activatedUrl);
+
+        final var result = urlService.activateUrl(1L);
+        assertThat(result.active()).isTrue();
+    }
+
 }

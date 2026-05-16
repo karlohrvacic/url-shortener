@@ -12,8 +12,9 @@ import org.springframework.web.servlet.view.RedirectView;
 
 public interface UrlService {
 
-    Page<UrlResponse> getAllUrls(Pageable pageable);
+    Page<UrlResponse> getAllUrls(Pageable pageable, UrlSearchDto search);
     UrlResponse revokeUrl(Long id);
+    UrlResponse activateUrl(Long id);
     void deleteUrl(Long id);
     void deactivateExpiredUrls();
     UrlResponse updateUrl(UrlUpdateDto url);

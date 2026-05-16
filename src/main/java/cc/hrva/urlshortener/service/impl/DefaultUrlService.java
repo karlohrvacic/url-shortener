@@ -138,8 +138,29 @@ public class DefaultUrlService implements UrlService {
     }
 
     @Override
-    public Page<UrlResponse> getAllUrls(final Pageable pageable) {
-        return urlRepository.findAll(pageable).map(UrlResponse::from);
+    public Page<UrlResponse> getAllUrls(final Pageable pageable, final UrlSearchDto search) {
+        Specification<Url> spec = null;
+
+        if (StringUtils.isNotEmpty(search.getSearch())) {
+            spec = UrlSpecification.search(search.getSearch());
+        }
+        if (search.getActive() != null) {
+            spec = (spec == null) ? UrlSpecification.hasActive(search.getActive()) : spec.and(UrlSpecification.hasActive(search.getActive()));
+        }
+        if (search.getExpired() != null && search.getExpired()) {
+            spec = (spec == null) ? UrlSpecification.isExpired() : spec.and(UrlSpecification.isExpired());
+        }
+        if (search.getDateFrom() != null) {
+            spec = (spec == null) ? UrlSpecification.createdAfter(search.getDateFrom()) : spec.and(UrlSpecification.createdAfter(search.getDateFrom()));
+        }
+        if (search.getDateTo() != null) {
+            spec = (spec == null) ? UrlSpecification.createdBefore(search.getDateTo()) : spec.and(UrlSpecification.createdBefore(search.getDateTo()));
+        }
+
+        if (spec == null) {
+            return urlRepository.findAll(pageable).map(UrlResponse::from);
+        }
+        return urlRepository.findAll(spec, pageable).map(UrlResponse::from);
     }
 
     @Override
@@ -153,6 +174,19 @@ public class DefaultUrlService implements UrlService {
         urlValidator.verifyUserAdminOrOwner(url);
 
         return UrlResponse.from(urlRepository.save(deactivateUrl(url)));
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "urls", key = "#result.shortUrl")
+    public UrlResponse activateUrl(final Long id) {
+        log.info("Activate URL id={}", id);
+
+        final var url = urlRepository.findById(id).orElseThrow(() -> new UrlNotFoundException("Url doesn't exist"));
+
+        urlValidator.verifyUserAdminOrOwner(url);
+
+        return UrlResponse.from(urlRepository.save(activateUrl(url)));
     }
 
     @Override
@@ -340,6 +374,11 @@ public class DefaultUrlService implements UrlService {
 
     public Url deactivateUrl(Url url) {
         url.setActive(false);
+        return url;
+    }
+
+    public Url activateUrl(Url url) {
+        url.setActive(true);
         return url;
     }
 

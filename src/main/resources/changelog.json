@@ -17,6 +17,7 @@
             "\"Expired only\" checkbox shows only links past their expiration date.",
             "Date range pickers (dateFrom / dateTo) filter by creation date.",
             "Admin users page: search by email and filter by active status.",
+            "Admin URLs page: search, status filter, expired-only checkbox, and sortable columns (Visits, Created).",
             "Backend uses JPA Specifications for composable, dynamic queries.",
             "Filter params bundled into UrlSearchDto / UserSearchDto instead of scattered @RequestParam annotations."
           ]
@@ -44,6 +45,30 @@
           ]
         },
         {
+          "title": "Sortable Columns",
+          "icon": "arrow-up-down",
+          "description": "Click column headers to sort.",
+          "items": [
+            "Dashboard: Visits, Created, and Expires columns are clickable with arrow indicators (↑↓↕).",
+            "Admin users: Email, Created, Last Login, and Status headers are sortable.",
+            "Admin URLs: Visits and Created columns are sortable.",
+            "Sort state persists in URL params (?sort=visits&order=asc) across page refreshes.",
+            "Default sort: URLs by newest first (createDate,desc), users by ID ascending."
+          ]
+        },
+        {
+          "title": "Admin URL Management",
+          "icon": "shield",
+          "description": "Admins can now fully manage all URLs in the system.",
+          "items": [
+            "Activate/deactivate toggle for any URL — deactivated URLs show a ToggleLeft icon to reactivate.",
+            "Edit dialog to change visit limit and expiration date on any URL.",
+            "New PATCH /api/v1/urls/{id}/activate endpoint on the backend.",
+            "Admin URLs page now has search, status filter, expired-only checkbox, and pagination with total count.",
+            "Row entrance animations and copy pulse on the admin URLs page."
+          ]
+        },
+        {
           "title": "Bug Fixes",
           "icon": "bug",
           "items": [
@@ -54,12 +79,35 @@
           ]
         },
         {
+          "title": "Animations",
+          "icon": "sparkles",
+          "items": [
+            "Copy button pulse: brief scale bump (1→1.25→1) on copy for tactile feedback.",
+            "Staggered row entrance: table rows fade in one by one with 30-40ms delays.",
+            "Stats counter: landing page totals tick up from 0 with ease-out animation.",
+            "Filter cross-fade: table remounts on filter change, re-triggering entrance animation."
+          ]
+        },
+        {
+          "title": "Easter Eggs",
+          "icon": "sparkles",
+          "description": "Hidden surprises for the curious.",
+          "items": [
+            "Konami code (\u2191\u2191\u2193\u2193\u2190\u2192\u2190\u2192BA) — turns the page into a rainbow overlay for 5 seconds.",
+            "/fortune page — random URL-themed fortunes that refresh on each visit.",
+            "/egg page — a duck that quacks. Quack it 10 times for a surprise QR code.",
+            "Console message — opens dev tools to find a hint. \u2728",
+            "Changelog footer — the see-no-evil monkey wiggles on hover."
+          ]
+        },
+        {
           "title": "Tests",
           "icon": "test-tube",
           "items": [
             "6 new unit tests for URL and User filtering (search, active, expired, date range).",
-            "Updated existing tests to match new service signatures.",
-            "Total: 146 tests, all passing (JUnit 5 + Mockito)."
+            "2 new tests for URL activate endpoint and service method.",
+            "Updated existing tests to match new service and controller signatures.",
+            "Total: 149 tests, all passing (JUnit 5 + Mockito)."
           ]
         }
       ]

@@ -153,12 +153,13 @@ public class UrlController {
         return ResponseEntity.ok(urlService.getAllMyUrls(apiKey, pageable, search));
     }
 
-    @Operation(summary = "Get all URLs (admin)", description = "Retrieve paginated list of all URLs in the system. Requires ROLE_ADMIN.")
+    @Operation(summary = "Get all URLs (admin)", description = "Retrieve paginated list of all URLs in the system. Supports filtering by search, active, expired, dateFrom, and dateTo. Requires ROLE_ADMIN.")
     @GetMapping("/all")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Page<UrlResponse>> getAllUrls(
-            @PageableDefault(size = 20) final Pageable pageable) {
-        return ResponseEntity.ok(urlService.getAllUrls(pageable));
+            @PageableDefault(size = 20) final Pageable pageable,
+            @ModelAttribute final UrlSearchDto search) {
+        return ResponseEntity.ok(urlService.getAllUrls(pageable, search));
     }
 
     @Operation(summary = "Deactivate a short URL", description = "Deactivate a short URL by its ID. Authentication required.")
@@ -166,6 +167,13 @@ public class UrlController {
     @PatchMapping("/{id}/deactivate")
     public ResponseEntity<UrlResponse> revokeUrl(@PathVariable("id") final Long id) {
         return ResponseEntity.ok(urlService.revokeUrl(id));
+    }
+
+    @Operation(summary = "Activate a short URL", description = "Reactivate a previously deactivated short URL by its ID. Authentication required.")
+    @ApiResponse(responseCode = "404", description = "URL not found")
+    @PatchMapping("/{id}/activate")
+    public ResponseEntity<UrlResponse> activateUrl(@PathVariable("id") final Long id) {
+        return ResponseEntity.ok(urlService.activateUrl(id));
     }
 
     @Operation(summary = "Delete a short URL", description = "Permanently delete a short URL by its ID. Authentication required.")
