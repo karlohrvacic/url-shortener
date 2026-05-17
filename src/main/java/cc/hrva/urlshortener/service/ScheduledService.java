@@ -8,5 +8,6 @@ public interface ScheduledService {
     void deactivateUnusedUserAccounts();
     void cleanupExpiredPasswordResetTokens();
     void notifyExpiringUrls();
+    void recheckUrlsSafeBrowsing();
 
 }

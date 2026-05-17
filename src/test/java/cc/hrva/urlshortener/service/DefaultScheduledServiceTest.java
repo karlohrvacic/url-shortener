@@ -32,9 +32,12 @@ class DefaultScheduledServiceTest {
     @Mock
     private UrlNotificationService urlNotificationService;
 
+    @Mock
+    private SafeBrowsingRecheckService safeBrowsingRecheckService;
+
     @BeforeEach
     void setUp() {
-        this.scheduledService = new DefaultScheduledService(urlService, userService, apiKeyService, ipAddressService, resetTokenService, urlNotificationService);
+        this.scheduledService = new DefaultScheduledService(urlService, userService, apiKeyService, ipAddressService, resetTokenService, urlNotificationService, safeBrowsingRecheckService);
     }
 
     @Test
@@ -73,5 +76,11 @@ class DefaultScheduledServiceTest {
     void shouldNotifyExpiringUrls() {
         scheduledService.notifyExpiringUrls();
         verify(urlNotificationService).notifyExpiringUrls();
+    }
+
+    @Test
+    void shouldRecheckUrlsSafeBrowsing() {
+        scheduledService.recheckUrlsSafeBrowsing();
+        verify(safeBrowsingRecheckService).recheckActiveUrls();
     }
 }

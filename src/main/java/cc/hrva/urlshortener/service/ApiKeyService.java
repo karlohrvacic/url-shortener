@@ -13,6 +13,7 @@ public interface ApiKeyService {
     void deactivateExpired();
     ApiKeyResponse generateNewApiKey();
     ApiKeyResponse revokeApiKey(Long id);
+    ApiKeyResponse activateApiKey(Long id);
     List<ApiKeyResponse> fetchMyApiKeys();
     Page<ApiKeyResponse> fetchAllApiKeys(Pageable pageable);
     ApiKey findApiKeyByKey(String key);

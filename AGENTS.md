@@ -81,6 +81,11 @@ cc.hrva.urlshortener
 | POST | `/api/v1/auth/password-reset` | None | Request reset |
 | POST | `/api/v1/auth/password-reset/confirm` | None | Confirm reset |
 | GET | `/api/v1/admin/stats` | ROLE_ADMIN | Dashboard stats (users, URLs, cache, etc.) |
+| GET | `/api/v1/admin/audit-log` | ROLE_ADMIN | Paginated admin audit trail |
+| GET | `/api/v1/admin/email-log` | ROLE_ADMIN | Paginated email delivery log |
+| GET | `/api/v1/admin/login-attempts` | ROLE_ADMIN | IP → attempt count map |
+| DELETE | `/api/v1/admin/login-attempts` | ROLE_ADMIN | Clear all rate limits |
+| GET | `/api/changelog` | Public | Changelog JSON |
 | GET | `/actuator/health` | Public | Health check |
 | GET | `/actuator/**` | ROLE_ADMIN | Metrics, caches, env, beans |
 
@@ -124,6 +129,28 @@ cc.hrva.urlshortener
 - **`oauth`**: Optional profile holding OAuth2 client credentials. Imported by `local` profile via `spring.config.import`.
 - Default: `application.yaml` sets base values (cache TTL, URL length, API limits, etc.).
 - Tests run without any profile — application context is not loaded.
+
+## New Models (recently added)
+
+### AuditLog (`audit_log` table, migration `008-audit-log.xml`)
+- Tracks admin actions: performedBy, action, targetType, targetIdentifier, details, performedAt
+- Auto-logged via `AdminAuditAspect` (AOP around admin controller methods)
+- Endpoint: `GET /api/v1/admin/audit-log`
+
+### EmailLog (`email_log` table, migration `009-email-log.xml`)
+- Records email sending: recipient, subject, status (SENDING/SENT/FAILED), errorMessage, sentAt, createdAt
+- Populated automatically by `tryToSendEmail` in `DefaultSendingEmailService`
+- Endpoint: `GET /api/v1/admin/email-log`
+
+## Cache Architecture
+- **Cache name**: `urls`
+- **TTL**: 7 days (configurable in `AppCacheConfiguration`)
+- **Used by**: `redirectResultUrl` (redirect) and `peekUrlByShortUrl` (peek) — both use manual `CacheManager` access
+- **Validation on cache hit**: `isUrlRedirectValid()` checks active, expirationDate, visitLimit/visits before serving
+- **Eviction**: `@CacheEvict` on revokeUrl, activateUrl, updateUrl (by key), deleteUrl (all entries)
+- **Warmup**: `CacheWarmup` loads top 20 most visited, most recent, and recently accessed URLs on startup
+- **Priming**: New URLs cached immediately on creation via `cacheUrlResponse()`
+- **Graceful degradation**: `CacheErrorHandler` logs and falls through to DB on Redis failure
 
 ## CI / Deploy
 - `.github/workflows/build.yml`: `mvn clean package` → Docker build/push to `ghcr.io`

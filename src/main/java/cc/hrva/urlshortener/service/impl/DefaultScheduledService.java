@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import cc.hrva.urlshortener.service.ApiKeyService;
 import cc.hrva.urlshortener.service.IPAddressService;
 import cc.hrva.urlshortener.service.ResetTokenService;
+import cc.hrva.urlshortener.service.SafeBrowsingRecheckService;
 import cc.hrva.urlshortener.service.ScheduledService;
 import cc.hrva.urlshortener.service.UrlNotificationService;
 import cc.hrva.urlshortener.service.UrlService;
@@ -25,6 +26,7 @@ public class DefaultScheduledService implements ScheduledService {
     private final IPAddressService ipAddressService;
     private final ResetTokenService resetTokenService;
     private final UrlNotificationService urlNotificationService;
+    private final SafeBrowsingRecheckService safeBrowsingRecheckService;
 
     @Override
     @Scheduled(cron = "0 */1 * * * *")
@@ -68,6 +70,13 @@ public class DefaultScheduledService implements ScheduledService {
     public void notifyExpiringUrls() {
         log.info("Scheduled: expiring URL notifications");
         urlNotificationService.notifyExpiringUrls();
+    }
+
+    @Override
+    @Scheduled(cron = "0 0 2 * * *")
+    public void recheckUrlsSafeBrowsing() {
+        log.info("Scheduled: SafeBrowsing recheck");
+        safeBrowsingRecheckService.recheckActiveUrls();
     }
 
 }

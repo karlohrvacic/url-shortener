@@ -2,11 +2,14 @@ package cc.hrva.urlshortener.controller;
 
 import cc.hrva.urlshortener.dto.AdminStatsResponse;
 import cc.hrva.urlshortener.service.AdminService;
+import cc.hrva.urlshortener.service.LoginAttemptService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Map;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final AdminService adminService;
+    private final LoginAttemptService loginAttemptService;
 
-    public AdminController(final AdminService adminService) {
+    public AdminController(final AdminService adminService, final LoginAttemptService loginAttemptService) {
         this.adminService = adminService;
+        this.loginAttemptService = loginAttemptService;
     }
 
     @GetMapping("/stats")
@@ -37,6 +42,19 @@ public class AdminController {
                 .header("Content-Disposition", "attachment; filename=all-urls.csv")
                 .contentType(MediaType.TEXT_PLAIN)
                 .body(csv);
+    }
+
+    @Operation(summary = "Get login attempts", description = "View current rate-limited IP addresses and their attempt counts. Requires ROLE_ADMIN.")
+    @GetMapping("/login-attempts")
+    public ResponseEntity<Map<String, Integer>> getLoginAttempts() {
+        return ResponseEntity.ok(loginAttemptService.getLoginAttempts());
+    }
+
+    @Operation(summary = "Clear login attempts", description = "Clear all rate limit data for all IPs. Requires ROLE_ADMIN.")
+    @DeleteMapping("/login-attempts")
+    public ResponseEntity<Void> clearLoginAttempts() {
+        loginAttemptService.clearLoginAttempts();
+        return ResponseEntity.noContent().build();
     }
 
 }

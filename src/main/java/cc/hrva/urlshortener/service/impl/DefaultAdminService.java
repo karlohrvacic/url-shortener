@@ -9,12 +9,10 @@ import cc.hrva.urlshortener.service.AdminService;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
-import java.lang.management.MemoryMXBean;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -74,7 +72,9 @@ public class DefaultAdminService implements AdminService {
     }
 
     private String escapeCsv(final String value) {
-        if (value == null) return "";
+        if (value == null) {
+            return "";
+        }
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
@@ -87,11 +87,22 @@ public class DefaultAdminService implements AdminService {
         final var totalUrls = urlRepository.count();
         final var activeUrls = urlRepository.countByActiveTrue();
         final var totalApiKeys = apiKeyRepository.count();
+        final var uptimeFormatted = formatUptime(ManagementFactory.getRuntimeMXBean().getUptime());
+        final var recentUrls = fetchRecentUrls();
+        final var cacheHitRatio = getCacheHitRatio();
+        final var activeProfiles = List.of(environment.getActiveProfiles());
+        final var jvmMemory = getJvmMemory();
+        final var requestsCount = getRequestCount();
+        final var redirectTimer = getRedirectTimer();
 
-        final var uptime = ManagementFactory.getRuntimeMXBean().getUptime();
-        final var uptimeFormatted = formatUptime(uptime);
+        return buildAdminStatsResponse(
+                totalUsers, totalUrls, activeUrls, totalApiKeys,
+                uptimeFormatted, recentUrls, cacheHitRatio, activeProfiles,
+                jvmMemory, requestsCount, redirectTimer);
+    }
 
-        final var recentUrls = urlRepository.findAll(PageRequest.of(0, 10)).stream()
+    private List<RecentUrl> fetchRecentUrls() {
+        return urlRepository.findAll(PageRequest.of(0, 10)).stream()
                 .map(url -> new RecentUrl(
                         url.getId(),
                         url.getShortUrl(),
@@ -100,12 +111,20 @@ public class DefaultAdminService implements AdminService {
                         url.getVisits(),
                         url.getOwner() != null ? url.getOwner().getEmail() : null))
                 .toList();
+    }
 
-        final var cacheHitRatio = getCacheHitRatio();
-        final var activeProfiles = List.of(environment.getActiveProfiles());
-        final var jvmMemory = getJvmMemory();
-        final var requestsCount = getRequestCount();
-
+    private AdminStatsResponse buildAdminStatsResponse(
+            final long totalUsers,
+            final long totalUrls,
+            final long activeUrls,
+            final long totalApiKeys,
+            final String uptimeFormatted,
+            final List<RecentUrl> recentUrls,
+            final String cacheHitRatio,
+            final List<String> activeProfiles,
+            final JvmMemory jvmMemory,
+            final long requestsCount,
+            final RedirectTiming redirectTimer) {
         return new AdminStatsResponse(
                 totalUsers,
                 totalUrls,
@@ -122,21 +141,36 @@ public class DefaultAdminService implements AdminService {
                 activeProfiles,
                 jvmMemory.used,
                 jvmMemory.max,
-                requestsCount);
+                requestsCount,
+                redirectTimer.avgMs,
+                redirectTimer.maxMs,
+                redirectTimer.count);
+    }
+
+    private record RedirectTiming(String avgMs, String maxMs, long count) {}
+
+    private RedirectTiming getRedirectTimer() {
+        try {
+            return readRedirectTimer();
+        } catch (final Exception e) {
+            return new RedirectTiming("—", "—", 0);
+        }
+    }
+
+    private RedirectTiming readRedirectTimer() {
+        final var timer = meterRegistry.find("redirect.duration").timer();
+        if (timer == null || timer.count() == 0) {
+            return new RedirectTiming("—", "—", 0);
+        }
+        final var avgMs = String.format("%.0f", timer.mean(TimeUnit.MILLISECONDS));
+        final var maxMs = String.format("%.0f", timer.max(TimeUnit.MILLISECONDS));
+        return new RedirectTiming(avgMs, maxMs, timer.count());
     }
 
     private String getCacheHitRatio() {
-        try {
-            final var gets = meterRegistry.find("cache.gets").tag("result", "hit").counters();
-            final var hits = gets.stream().mapToLong(c -> (long) c.count()).sum();
-            final var misses = meterRegistry.find("cache.gets").tag("result", "miss").counters().stream()
-                    .mapToLong(c -> (long) c.count()).sum();
-            final var total = hits + misses;
-            if (total > 0) {
-                return String.format("%.1f%%", (double) hits / total * 100);
-            }
-        } catch (final Exception e) {
-            log.debug("Failed to read Micrometer cache metrics", e);
+        final var ratio = getCacheHitRatioFromMeterRegistry();
+        if (ratio != null) {
+            return ratio;
         }
 
         final var cache = cacheManager.getCache("urls");
@@ -150,6 +184,23 @@ public class DefaultAdminService implements AdminService {
         }
 
         return "—";
+    }
+
+    private String getCacheHitRatioFromMeterRegistry() {
+        try {
+            final var gets = meterRegistry.find("cache.gets").tag("result", "hit").counters();
+            final var hits = gets.stream().mapToLong(counter -> (long) counter.count()).sum();
+            final var misses = meterRegistry.find("cache.gets").tag("result", "miss").counters().stream()
+                    .mapToLong(counter -> (long) counter.count()).sum();
+            final var total = hits + misses;
+            if (total > 0) {
+                return String.format("%.1f%%", (double) hits / total * 100);
+            }
+        } catch (final Exception e) {
+            log.debug("Failed to read Micrometer cache metrics", e);
+        }
+
+        return null;
     }
 
     private JvmMemory getJvmMemory() {

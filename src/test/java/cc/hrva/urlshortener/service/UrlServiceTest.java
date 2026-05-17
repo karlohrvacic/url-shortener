@@ -3,6 +3,7 @@ package cc.hrva.urlshortener.service;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Optional;
+import io.micrometer.core.instrument.MeterRegistry;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
@@ -80,6 +81,9 @@ class UrlServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private MeterRegistry meterRegistry;
+
     @BeforeEach
     void setUp() {
         this.urlService = new DefaultUrlService(
@@ -95,7 +99,8 @@ class UrlServiceTest {
                 createUrlToUrlConverter,
                 urlUpdateDtoToUrlConverter,
                 cacheManager,
-                objectMapper
+                objectMapper,
+                meterRegistry
         );
     }
 

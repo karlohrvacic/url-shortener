@@ -78,8 +78,9 @@ public class DefaultUserService implements UserService {
         final var user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        if (Boolean.FALSE.equals(user.getActive()))
+        if (Boolean.FALSE.equals(user.getActive())) {
             throw new UserNotFoundException("User is inactive, please contact administrator");
+        }
 
         return user;
     }
@@ -92,6 +93,15 @@ public class DefaultUserService implements UserService {
 
     @Override
     public Page<User> fetchAllUsers(final Pageable pageable, final UserSearchDto search) {
+        final var spec = buildSpecification(search);
+
+        if (spec == null) {
+            return userRepository.findAll(pageable);
+        }
+        return userRepository.findAll(spec, pageable);
+    }
+
+    private Specification<User> buildSpecification(final UserSearchDto search) {
         Specification<User> spec = null;
 
         if (StringUtils.isNotEmpty(search.getSearch())) {
@@ -101,10 +111,7 @@ public class DefaultUserService implements UserService {
             spec = (spec == null) ? UserSpecification.hasActive(search.getActive()) : spec.and(UserSpecification.hasActive(search.getActive()));
         }
 
-        if (spec == null) {
-            return userRepository.findAll(pageable);
-        }
-        return userRepository.findAll(spec, pageable);
+        return spec;
     }
 
     @Override
@@ -124,7 +131,7 @@ public class DefaultUserService implements UserService {
 
         if (existingUser.getAuthProvider() != null && !"local".equals(existingUser.getAuthProvider())
                 && userUpdateDto.getEmail() != null && !userUpdateDto.getEmail().equals(existingUser.getEmail())) {
-            throw new ApiException("Email cannot be changed for " + existingUser.getAuthProvider() + " accounts");
+            throw new ApiException("Email cannot be changed for %s accounts".formatted(existingUser.getAuthProvider()));
         }
 
         return userRepository.save(Objects.requireNonNull(userUpdateDtoToUserConverter.convert(userUpdateDto)));
@@ -183,7 +190,9 @@ public class DefaultUserService implements UserService {
                 .toList();
 
         userRepository.saveAll(users);
-        if (!users.isEmpty()) log.info("Deactivated {} users", users.size());
+        if (!users.isEmpty()) {
+            log.info("Deactivated {} users", users.size());
+        }
     }
 
     @Override

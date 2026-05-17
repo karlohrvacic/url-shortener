@@ -24,9 +24,12 @@ import cc.hrva.urlshortener.validator.UrlValidator;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import tools.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -63,6 +66,7 @@ public class DefaultUrlService implements UrlService {
     private final UrlUpdateDtoToUrlConverter urlUpdateDtoToUrlConverter;
     private final CacheManager cacheManager;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional
@@ -88,7 +92,7 @@ public class DefaultUrlService implements UrlService {
 
         log.info("Creating URL with API key longUrl={}", createUrlDto.getLongUrl());
 
-        final ApiKey apiKey = getApiKey(key);
+        final var apiKey = getApiKey(key);
         setShortUrlForLoggedInUser(url, apiKey);
 
         log.info("Saving URL");
@@ -100,13 +104,7 @@ public class DefaultUrlService implements UrlService {
     @Override
     public Page<UrlResponse> getAllMyUrls(final String apiKey, final Pageable pageable,
             final UrlSearchDto search) {
-        final User user;
-        if (StringUtils.isNotEmpty(apiKey)) {
-            apiKeyValidator.apiKeyExistsByKeyAndIsValid(apiKey);
-            user = apiKeyService.fetchApiKeyByKey(apiKey).getOwner();
-        } else {
-            user = userService.getUserFromToken();
-        }
+        final var user = getUserForExport(apiKey);
 
         var spec = Specification.where(UrlSpecification.hasOwner(user));
 
@@ -131,7 +129,7 @@ public class DefaultUrlService implements UrlService {
 
     @Override
     public Page<UrlResponse> getAllUrls(final Pageable pageable, final UrlSearchDto search) {
-        Specification<Url> spec = null;
+        var spec = (Specification<Url>) null;
 
         if (StringUtils.isNotEmpty(search.getSearch())) {
             spec = UrlSpecification.search(search.getSearch());
@@ -242,7 +240,9 @@ public class DefaultUrlService implements UrlService {
     }
 
     private String escapeCsv(final String value) {
-        if (value == null) return "";
+        if (value == null) {
+            return "";
+        }
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
@@ -259,20 +259,15 @@ public class DefaultUrlService implements UrlService {
 
     @Override
     public PeekUrl peekUrlByShortUrl(final String shortUrl) {
-        final var cache = cacheManager.getCache("urls");
-        if (cache != null) {
-            final var cached = Optional.ofNullable(cache.get(shortUrl))
-                    .map(org.springframework.cache.Cache.ValueWrapper::get)
-                    .map(v -> v instanceof PeekUrl pk ? pk : null)
-                    .orElse(null);
-            if (cached != null) {
-                return cached;
-            }
+        final var cached = getFromCache(shortUrl);
+        if (cached instanceof PeekUrl peekUrl) {
+            return peekUrl;
         }
 
         final var url = findUrlByShortUrlAndActive(shortUrl);
         final var peekUrl = urlToPeekUrlConverter.convert(url);
 
+        final var cache = cacheManager.getCache("urls");
         if (cache != null) {
             cache.put(shortUrl, peekUrl);
         }
@@ -288,65 +283,104 @@ public class DefaultUrlService implements UrlService {
                 .toList();
 
         urlRepository.saveAll(urls);
-        if (!urls.isEmpty()) log.info("Deactivated {} urls", urls.size());
+        if (!urls.isEmpty()) {
+            log.info("Deactivated {} urls", urls.size());
+        }
     }
 
     @Override
     public RedirectView redirectResultUrl(final String shortUrl, final String clientIP) {
+        final var sample = Timer.start(meterRegistry);
         log.info("Redirect shortUrl={} clientIP={}", shortUrl, clientIP);
 
-        final var redirectView = new RedirectView();
-
         if (StringUtils.isNotEmpty(shortUrl)) {
-            // Try cache first
-            final var cache = cacheManager.getCache("urls");
-            if (cache != null) {
-                final var cached = Optional.ofNullable(cache.get(shortUrl))
-                        .map(org.springframework.cache.Cache.ValueWrapper::get)
-                        .map(v -> v instanceof UrlResponse ur ? ur : mapToUrlResponse(v))
-                        .orElse(null);
-                if (cached != null) {
-                    if (isUrlRedirectValid(cached)) {
-                        redirectView.setUrl(cached.longUrl());
-                        fireVisitTracking(shortUrl, clientIP);
-                        return redirectView;
-                    }
-                    // Stale entry — evict and fall through
-                    cache.evict(shortUrl);
-                }
+            final var cachedRedirect = tryCacheHit(shortUrl, clientIP);
+            if (cachedRedirect != null) {
+                sample.stop(Timer.builder("redirect.duration")
+                        .tag("source", "cache")
+                        .register(meterRegistry));
+                return cachedRedirect;
             }
 
-            // Cache miss or invalid — fetch from DB
-            final var urlOpt = urlRepository.findByShortUrlAndActiveTrue(shortUrl);
-            if (urlOpt.isPresent()) {
-                final var url = urlOpt.get();
-                final var response = UrlResponse.from(url);
-                if (cache != null) {
-                    cache.put(shortUrl, response);
-                }
-                redirectView.setUrl(response.longUrl());
-                asyncCheckIfVisitUnique(clientIP, url);
-            } else {
-                redirectView.setUrl(appProperties.getFrontendUrl());
-            }
-        } else {
-            redirectView.setUrl(appProperties.getFrontendUrl());
+            final var redirectView = new RedirectView();
+            redirectView.setUrl(fetchAndRedirectFromDb(shortUrl, clientIP));
+            sample.stop(Timer.builder("redirect.duration")
+                    .tag("source", "db")
+                    .register(meterRegistry));
+            return redirectView;
         }
 
+        final var redirectView = new RedirectView();
+        redirectView.setUrl(appProperties.getFrontendUrl());
+        sample.stop(Timer.builder("redirect.duration")
+                .tag("source", "db")
+                .register(meterRegistry));
         return redirectView;
     }
 
+    private RedirectView tryCacheHit(final String shortUrl, final String clientIP) {
+        final var cachedValue = Optional.ofNullable(getFromCache(shortUrl))
+                .map(value -> value instanceof UrlResponse ur ? ur : mapToUrlResponse(value))
+                .orElse(null);
+        if (cachedValue != null) {
+            if (isUrlRedirectValid(cachedValue)) {
+                final var redirectView = new RedirectView();
+                redirectView.setUrl(cachedValue.longUrl());
+                fireVisitTracking(shortUrl, clientIP);
+                return redirectView;
+            }
+            final var cache = cacheManager.getCache("urls");
+            if (cache != null) {
+                cache.evict(shortUrl);
+            }
+        }
+        return null;
+    }
+
+    private String fetchAndRedirectFromDb(final String shortUrl, final String clientIP) {
+        final var urlOpt = urlRepository.findByShortUrlAndActiveTrue(shortUrl);
+        if (urlOpt.isPresent()) {
+            final var url = urlOpt.get();
+            final var response = UrlResponse.from(url);
+            final var cache = cacheManager.getCache("urls");
+            if (cache != null) {
+                cache.put(shortUrl, response);
+            }
+            asyncCheckIfVisitUnique(clientIP, url);
+            return response.longUrl();
+        }
+        return appProperties.getFrontendUrl();
+    }
+
+    private Object getFromCache(final String shortUrl) {
+        final var cache = cacheManager.getCache("urls");
+        if (cache != null) {
+            return Optional.ofNullable(cache.get(shortUrl))
+                    .map(Cache.ValueWrapper::get)
+                    .orElse(null);
+        }
+        return null;
+    }
+
     private boolean isUrlRedirectValid(final UrlResponse response) {
-        if (!response.active()) return false;
-        if (response.expirationDate() != null && LocalDateTime.now().isAfter(response.expirationDate())) return false;
+        if (!response.active()) {
+            return false;
+        }
+        if (response.expirationDate() != null && LocalDateTime.now().isAfter(response.expirationDate())) {
+            return false;
+        }
         if (response.visitLimit() != null && response.visitLimit() > 0
-                && response.visits() != null && response.visits() >= response.visitLimit()) return false;
+                && response.visits() != null && response.visits() >= response.visitLimit()) {
+            return false;
+        }
         return true;
     }
 
     @SuppressWarnings("unchecked")
     private UrlResponse mapToUrlResponse(final Object value) {
-        if (value instanceof UrlResponse ur) return ur;
+        if (value instanceof UrlResponse ur) {
+            return ur;
+        }
         if (value instanceof LinkedHashMap<?, ?> map) {
             try {
                 return objectMapper.convertValue(map, UrlResponse.class);
@@ -415,18 +449,15 @@ public class DefaultUrlService implements UrlService {
         return saved;
     }
 
-    private ApiKey getApiKey(String key) {
-        final ApiKey apiKey;
-
+    private ApiKey getApiKey(final String key) {
         if (StringUtils.isNotEmpty(key)) {
-            apiKey = apiKeyService.fetchApiKeyByKey(key);
-        } else {
-            apiKey = getFirstApiKeyForLoggedInUser();
-            key = apiKey.getKey();
+            final var apiKey = apiKeyService.fetchApiKeyByKey(key);
+            apiKeyValidator.apiKeyExistsByKeyAndIsValid(key);
+            return apiKey;
         }
 
-        apiKeyValidator.apiKeyExistsByKeyAndIsValid(key);
-
+        final var apiKey = getFirstApiKeyForLoggedInUser();
+        apiKeyValidator.apiKeyExistsByKeyAndIsValid(apiKey.getKey());
         return apiKey;
     }
 
@@ -471,12 +502,12 @@ public class DefaultUrlService implements UrlService {
                 .orElseGet(() -> apiKeyService.findApiKeyByKey(apiKeyService.generateNewApiKey().key()));
     }
 
-    public Url deactivateUrl(Url url) {
+    public Url deactivateUrl(final Url url) {
         url.setActive(false);
         return url;
     }
 
-    public Url activateUrl(Url url) {
+    public Url activateUrl(final Url url) {
         url.setActive(true);
         return url;
     }

@@ -66,6 +66,19 @@ public class DefaultApiKeyService implements ApiKeyService {
 
     @Override
     @Transactional
+    public ApiKeyResponse activateApiKey(final Long id) {
+        log.info("Activated API key id={}", id);
+
+        final var apiKey = apiKeyRepository.findById(id)
+                .orElseThrow(() -> new ApiKeyNotFoundException("Api key doesn't exist"));
+
+        apiKeyValidator.verifyUserAdminOrOwner(apiKey);
+        apiKey.setActive(true);
+        return ApiKeyResponse.from(apiKeyRepository.save(apiKey));
+    }
+
+    @Override
+    @Transactional
     public ApiKey apiKeyUseAction(final ApiKey apiKey) {
         return apiKeyRepository.save(apiKey.apiKeyUsed());
     }

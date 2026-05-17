@@ -1,15 +1,20 @@
 package cc.hrva.urlshortener.service.impl;
 
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
+import cc.hrva.urlshortener.model.EmailLog;
+import cc.hrva.urlshortener.repository.EmailLogRepository;
 import jakarta.mail.MessagingException;
 import java.text.MessageFormat;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import cc.hrva.urlshortener.model.Email;
 import cc.hrva.urlshortener.model.ResetToken;
+import cc.hrva.urlshortener.model.Url;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.service.SendingEmailService;
 import org.springframework.scheduling.annotation.Async;
@@ -25,6 +30,7 @@ public class DefaultSendingEmailService implements SendingEmailService {
     private final AppProperties appProperties;
     private final TemplateEngine templateEngine;
     private final DefaultEmailService emailService;
+    private final EmailLogRepository emailLogRepository;
 
     @Override
     @Async
@@ -80,27 +86,79 @@ public class DefaultSendingEmailService implements SendingEmailService {
         tryToSendEmail(email);
     }
 
+    @Override
+    @Async
+    public void sendEmailUrlMalwareDetected(final User user, final Url url, final String threatType) {
+        final var ctx = getContext(user);
+        ctx.setVariable("shortUrl", url.getShortUrl());
+        ctx.setVariable("longUrl", url.getLongUrl());
+        ctx.setVariable("threatType", threatType);
+
+        final var htmlContent = templateEngine.process("url_malware_detected", ctx);
+
+        final var email = Email.builder()
+                .sender(appProperties.getEmailSenderAddress())
+                .receivers(new String[]{user.getEmail()})
+                .subject("URL deactivated — malware detected")
+                .text(htmlContent)
+                .build();
+
+        tryToSendEmail(email);
+    }
+
     public void tryToSendEmail(final Email email) {
+        final var logEntry = emailLogRepository.save(EmailLog.builder()
+                .recipient(Arrays.toString(email.getReceivers()))
+                .subject(email.getSubject())
+                .status("SENDING")
+                .build());
+
         log.info("Sending {} email to {}", email.getSubject(), Arrays.toString(email.getReceivers()));
+        sendEmailWithRetries(email, logEntry);
+    }
+
+    private void sendEmailWithRetries(final Email email, final EmailLog logEntry) {
         int attempts = 0;
         while (attempts < 3) {
-            try {
-                emailService.sendEmail(email, null);
+            final var exception = attemptSendEmail(email);
+            if (exception.isEmpty()) {
+                logEntry.setStatus("SENT");
+                logEntry.setSentAt(LocalDateTime.now());
+                emailLogRepository.save(logEntry);
                 return;
-            } catch (final MessagingException e) {
-                attempts++;
-                if (attempts >= 3) {
-                    log.error("Failed to send email after {} attempts", attempts, e);
-                } else {
-                    log.warn("Failed to send email (attempt {}/3), retrying...", attempts);
-                    try {
-                        Thread.sleep((long) Math.pow(2, attempts) * 100L);
-                    } catch (final InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
+            }
+
+            attempts++;
+            if (attempts >= 3) {
+                log.error("Failed to send email after {} attempts", attempts, exception.get());
+                logEntry.setStatus("FAILED");
+                logEntry.setErrorMessage(exception.get().getMessage());
+                emailLogRepository.save(logEntry);
+            } else {
+                log.warn("Failed to send email (attempt {}/3), retrying...", attempts);
+                if (!sleepBeforeRetry(attempts)) {
+                    return;
                 }
             }
+        }
+    }
+
+    private Optional<MessagingException> attemptSendEmail(final Email email) {
+        try {
+            emailService.sendEmail(email, null);
+            return Optional.empty();
+        } catch (final MessagingException e) {
+            return Optional.of(e);
+        }
+    }
+
+    private boolean sleepBeforeRetry(final int attemptNumber) {
+        try {
+            Thread.sleep((long) Math.pow(2, attemptNumber) * 100L);
+            return true;
+        } catch (final InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 
@@ -120,4 +178,3 @@ public class DefaultSendingEmailService implements SendingEmailService {
     }
 
 }
-

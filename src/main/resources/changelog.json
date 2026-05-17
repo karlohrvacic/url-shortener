@@ -101,13 +101,38 @@
           ]
         },
         {
+          "title": "Admin Tools",
+          "icon": "shield",
+          "description": "New admin capabilities for system management.",
+          "items": [
+            "Audit Log table — every admin action (deactivate/activate/delete/update) is auto-logged with timestamp, admin email, and details via AOP aspect. Paginated view at /admin/audit-log.",
+            "Email Log table — all sent emails recorded with SENDING/SENT/FAILED status tracking. View delivery status at /admin/email-log.",
+            "System Health page — green/red status indicators for Database, Redis Cache, SMTP, and SafeBrowsing API.",
+            "Login Rate Limits viewer on admin dashboard — shows active IP rate limits with auto-refresh and clear-all button.",
+            "Bulk URL Management — checkbox selection on All URLs table with batch Activate/Deactivate/Delete actions.",
+            "New admin nav links: Health, Audit Log, Email Log."
+          ]
+        },
+        {
+          "title": "Cache Improvements",
+          "icon": "zap",
+          "items": [
+            "Redirect endpoint now cache-first: every GET /{short} checks Redis before DB, with validation on cache hit.",
+            "Cache warmup on startup: top 20 most visited, most recent, and recently accessed URLs pre-loaded into Redis.",
+            "Cache priming on creation: newly created URLs immediately cached.",
+            "TTL increased from 60 minutes to 7 days (stale data caught by validation on cache hit).",
+            "SafeBrowsing recheck scheduled task: daily at 2 AM, re-scans all active URLs against Google SafeBrowsing. Flagged URLs auto-deactivated and owner notified via email."
+          ]
+        },
+        {
           "title": "Tests",
           "icon": "test-tube",
           "items": [
             "6 new unit tests for URL and User filtering (search, active, expired, date range).",
             "2 new tests for URL activate endpoint and service method.",
             "Updated existing tests to match new service and controller signatures.",
-            "Total: 149 tests, all passing (JUnit 5 + Mockito)."
+            "3 new tests for scheduled safe browsing recheck and audit wiring.",
+            "Total: 150 tests, all passing (JUnit 5 + Mockito)."
           ]
         }
       ]

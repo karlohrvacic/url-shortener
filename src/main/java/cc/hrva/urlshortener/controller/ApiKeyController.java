@@ -68,4 +68,11 @@ public class ApiKeyController {
         return ResponseEntity.ok(apiKeyService.revokeApiKey(id));
     }
 
+    @Operation(summary = "Activate an API key", description = "Reactivate a previously revoked API key by its ID. Authentication required.")
+    @ApiResponse(responseCode = "404", description = "API key not found")
+    @PatchMapping("/{id}/activate")
+    public ResponseEntity<ApiKeyResponse> activateApiKey(@PathVariable("id") final Long id) {
+        return ResponseEntity.ok(apiKeyService.activateApiKey(id));
+    }
+
 }

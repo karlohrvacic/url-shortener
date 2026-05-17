@@ -19,7 +19,10 @@ public record AdminStatsResponse(
         List<String> activeProfiles,
         String jvmMemoryUsed,
         String jvmMemoryMax,
-        long requestsCount) {
+        long requestsCount,
+        String redirectAvgMs,
+        String redirectMaxMs,
+        long redirectCount) {
 
     public record RecentUrl(Long id, String shortUrl, String longUrl, LocalDateTime createDate, long visits, String ownerEmail) {}
 

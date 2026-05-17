@@ -51,4 +51,16 @@ public class DefaultLoginAttemptService implements LoginAttemptService {
         }
     }
 
+    @Override
+    public java.util.Map<String, Integer> getLoginAttempts() {
+        final var map = new java.util.LinkedHashMap<String, Integer>();
+        map.putAll(attemptsCache.asMap());
+        return map;
+    }
+
+    @Override
+    public void clearLoginAttempts() {
+        attemptsCache.invalidateAll();
+    }
+
 }
