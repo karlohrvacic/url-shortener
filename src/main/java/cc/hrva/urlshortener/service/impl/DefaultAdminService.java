@@ -13,10 +13,12 @@ import java.lang.management.MemoryMXBean;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,7 @@ public class DefaultAdminService implements AdminService {
     private final UrlRepository urlRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final MeterRegistry meterRegistry;
+    private final CacheManager cacheManager;
     private final Environment environment;
 
     @Value("${spring.application.name:url-shortener}")
@@ -40,11 +43,13 @@ public class DefaultAdminService implements AdminService {
             final UrlRepository urlRepository,
             final ApiKeyRepository apiKeyRepository,
             final MeterRegistry meterRegistry,
+            final CacheManager cacheManager,
             final Environment environment) {
         this.userRepository = userRepository;
         this.urlRepository = urlRepository;
         this.apiKeyRepository = apiKeyRepository;
         this.meterRegistry = meterRegistry;
+        this.cacheManager = cacheManager;
         this.environment = environment;
     }
 
@@ -127,13 +132,24 @@ public class DefaultAdminService implements AdminService {
             final var misses = meterRegistry.find("cache.gets").tag("result", "miss").counters().stream()
                     .mapToLong(c -> (long) c.count()).sum();
             final var total = hits + misses;
-            if (total == 0) {
-                return "—";
+            if (total > 0) {
+                return String.format("%.1f%%", (double) hits / total * 100);
             }
-            return String.format("%.1f%%", (double) hits / total * 100);
         } catch (final Exception e) {
-            return "—";
+            log.debug("Failed to read Micrometer cache metrics", e);
         }
+
+        final var cache = cacheManager.getCache("urls");
+        if (cache != null) {
+            try {
+                cache.get("__health__");
+                return "Active";
+            } catch (final Exception e) {
+                return "Unreachable";
+            }
+        }
+
+        return "—";
     }
 
     private JvmMemory getJvmMemory() {

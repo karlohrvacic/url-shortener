@@ -7,6 +7,7 @@ import cc.hrva.urlshortener.repository.UrlRepository;
 import cc.hrva.urlshortener.service.SafeBrowsingService;
 import cc.hrva.urlshortener.service.UserService;
 import cc.hrva.urlshortener.validator.UrlValidator;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,8 @@ public class DefaultUrlValidator implements UrlValidator {
     private final AppProperties appProperties;
     private final SafeBrowsingService safeBrowsingService;
 
+    private static final List<String> RESERVED_PREFIXES = List.of("api");
+
     @Override
     public void longUrlInUrl(final Url url) {
         if (url.getLongUrl() == null) {
@@ -32,6 +35,13 @@ public class DefaultUrlValidator implements UrlValidator {
     public void checkIfShortUrlIsUnique(final String shortUrl) {
         if (urlRepository.existsUrlByShortUrlAndActiveTrue(shortUrl)) {
             throw new ShortUrlAlreadyExistsException("Short URL is already in use");
+        }
+    }
+
+    @Override
+    public void checkIfShortUrlIsReserved(final String shortUrl) {
+        if (shortUrl != null && RESERVED_PREFIXES.stream().anyMatch(shortUrl::startsWith)) {
+            throw new ShortUrlAlreadyExistsException("Short URL can't start with reserved prefix: " + shortUrl);
         }
     }
 

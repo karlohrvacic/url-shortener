@@ -24,8 +24,10 @@ import cc.hrva.urlshortener.validator.UrlValidator;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.task.TaskExecutor;
@@ -38,7 +40,9 @@ import org.springframework.web.servlet.view.RedirectView;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -57,22 +61,8 @@ public class DefaultUrlService implements UrlService {
     private final UrlToPeekUrlConverter urlToPeekUrlConverter;
     private final CreateUrlToUrlConverter createUrlToUrlConverter;
     private final UrlUpdateDtoToUrlConverter urlUpdateDtoToUrlConverter;
-
-    @Override
-    @Transactional
-    public RedirectView redirectResultUrl(final String shortUrl, final String clientIP) {
-        log.info("Redirect shortUrl={} clientIP={}", shortUrl, clientIP);
-
-        final RedirectView redirectView = new RedirectView();
-
-        if (StringUtils.isNotEmpty(shortUrl) && urlRepository.existsUrlByShortUrlAndActiveTrue(shortUrl)) {
-            redirectView.setUrl(checkIPUniquenessAndReturnUrl(shortUrl, clientIP).longUrl());
-        } else {
-            redirectView.setUrl(appProperties.getFrontendUrl());
-        }
-
-        return redirectView;
-    }
+    private final CacheManager cacheManager;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -266,16 +256,30 @@ public class DefaultUrlService implements UrlService {
     }
 
     @Override
-    @Cacheable(value = "urls", key = "#shortUrl")
     public PeekUrl peekUrlByShortUrl(final String shortUrl) {
-        final var url = findUrlByShortUrlAndActive(shortUrl);
+        final var cache = cacheManager.getCache("urls");
+        if (cache != null) {
+            final var cached = Optional.ofNullable(cache.get(shortUrl))
+                    .map(org.springframework.cache.Cache.ValueWrapper::get)
+                    .map(v -> v instanceof PeekUrl pk ? pk : null)
+                    .orElse(null);
+            if (cached != null) {
+                return cached;
+            }
+        }
 
-        return urlToPeekUrlConverter.convert(url);
+        final var url = findUrlByShortUrlAndActive(shortUrl);
+        final var peekUrl = urlToPeekUrlConverter.convert(url);
+
+        if (cache != null) {
+            cache.put(shortUrl, peekUrl);
+        }
+
+        return peekUrl;
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "urls", allEntries = true)
     public void deactivateExpiredUrls() {
         final var urls = urlRepository.findByExpirationDateLessThanEqualAndActiveTrue(LocalDateTime.now()).stream()
                 .map(this::deactivateUrl)
@@ -286,8 +290,80 @@ public class DefaultUrlService implements UrlService {
     }
 
     @Override
-    public Url getUrlByLongUrl(final String longUrl) {
-        return urlRepository.findByLongUrlAndActiveTrue(longUrl).orElseThrow(() -> new UrlNotFoundException("URL doesn't exist"));
+    public RedirectView redirectResultUrl(final String shortUrl, final String clientIP) {
+        log.info("Redirect shortUrl={} clientIP={}", shortUrl, clientIP);
+
+        final var redirectView = new RedirectView();
+
+        if (StringUtils.isNotEmpty(shortUrl)) {
+            // Try cache first
+            final var cache = cacheManager.getCache("urls");
+            if (cache != null) {
+                final var cached = Optional.ofNullable(cache.get(shortUrl))
+                        .map(org.springframework.cache.Cache.ValueWrapper::get)
+                        .map(v -> v instanceof UrlResponse ur ? ur : mapToUrlResponse(v))
+                        .orElse(null);
+                if (cached != null) {
+                    if (isUrlRedirectValid(cached)) {
+                        redirectView.setUrl(cached.longUrl());
+                        fireVisitTracking(shortUrl, clientIP);
+                        return redirectView;
+                    }
+                    // Stale entry — evict and fall through
+                    cache.evict(shortUrl);
+                }
+            }
+
+            // Cache miss or invalid — fetch from DB
+            final var urlOpt = urlRepository.findByShortUrlAndActiveTrue(shortUrl);
+            if (urlOpt.isPresent()) {
+                final var url = urlOpt.get();
+                final var response = UrlResponse.from(url);
+                if (cache != null) {
+                    cache.put(shortUrl, response);
+                }
+                redirectView.setUrl(response.longUrl());
+                asyncCheckIfVisitUnique(clientIP, url);
+            } else {
+                redirectView.setUrl(appProperties.getFrontendUrl());
+            }
+        } else {
+            redirectView.setUrl(appProperties.getFrontendUrl());
+        }
+
+        return redirectView;
+    }
+
+    private boolean isUrlRedirectValid(final UrlResponse response) {
+        if (!response.active()) return false;
+        if (response.expirationDate() != null && LocalDateTime.now().isAfter(response.expirationDate())) return false;
+        if (response.visitLimit() != null && response.visitLimit() > 0
+                && response.visits() != null && response.visits() >= response.visitLimit()) return false;
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private UrlResponse mapToUrlResponse(final Object value) {
+        if (value instanceof UrlResponse ur) return ur;
+        if (value instanceof LinkedHashMap<?, ?> map) {
+            try {
+                return objectMapper.convertValue(map, UrlResponse.class);
+            } catch (final Exception e) {
+                log.warn("Failed to convert cached value to UrlResponse", e);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private void fireVisitTracking(final String shortUrl, final String clientIP) {
+        applicationTaskExecutor.execute(() -> {
+            urlRepository.findByShortUrlAndActiveTrue(shortUrl).ifPresent(url -> {
+                if (!ipAddressService.urlAlreadyVisitedByIP(url, clientIP)) {
+                    urlRepository.save(url.onVisit());
+                }
+            });
+        });
     }
 
     @Override
@@ -297,6 +373,11 @@ public class DefaultUrlService implements UrlService {
 
     private Url findUrlByShortUrlAndActive(final String shortUrl) {
         return urlRepository.findByShortUrlAndActiveTrue(shortUrl).orElseThrow(() -> new UrlNotFoundException("URL doesn't exist"));
+    }
+
+    @Override
+    public Url getUrlByLongUrl(final String longUrl) {
+        return urlRepository.findByLongUrlAndActiveTrue(longUrl).orElseThrow(() -> new UrlNotFoundException("URL doesn't exist"));
     }
 
     private Url createUrlForAnonymousUser(final Url url) {
@@ -312,6 +393,7 @@ public class DefaultUrlService implements UrlService {
         url.setShortUrl(generateShortUrl(appProperties.getShortUrlLength()));
 
         urlValidator.checkIfShortUrlIsUnique(url.getShortUrl());
+        urlValidator.checkIfShortUrlIsReserved(url.getShortUrl());
 
         log.info("Saving URL");
         return urlRepository.save(url);
@@ -353,6 +435,7 @@ public class DefaultUrlService implements UrlService {
         }
 
         urlValidator.checkIfShortUrlIsUnique(url.getShortUrl());
+        urlValidator.checkIfShortUrlIsReserved(url.getShortUrl());
 
         url.setApiKey(apiKey);
         url.setOwner(apiKey.getOwner());

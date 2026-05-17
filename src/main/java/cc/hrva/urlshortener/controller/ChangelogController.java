@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("api/v1/changelog")
+@RequestMapping("api/changelog")
 public class ChangelogController {
 
     @Operation(summary = "Get changelog", description = "Return the changelog JSON with all releases, features, and fixes.")

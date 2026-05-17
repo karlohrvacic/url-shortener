@@ -16,7 +16,7 @@ class ChangelogControllerTest {
 
     @Test
     void shouldReturnChangelog() throws Exception {
-        mockMvc.perform(get("/api/v1/changelog"))
+        mockMvc.perform(get("/api/changelog"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.releases").isArray())
                 .andExpect(jsonPath("$.releases[0].version").isString());

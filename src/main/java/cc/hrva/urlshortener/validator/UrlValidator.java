@@ -9,6 +9,7 @@ public interface UrlValidator {
     void verifyUserAdminOrOwner(Url url);
     void checkIfAnonymousUrlCreationEnabled();
     void checkIfShortUrlIsUnique(String shortUrl);
+    void checkIfShortUrlIsReserved(String shortUrl);
     void checkIfUrlExpirationDateIsInThePast(Url url);
 
 }

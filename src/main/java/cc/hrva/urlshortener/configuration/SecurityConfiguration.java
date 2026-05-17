@@ -56,8 +56,8 @@ public class SecurityConfiguration {
                         authorizeRequests
                                 .requestMatchers(
                                         "/api/v1/auth/**",
-                                        "/api/v1/url/**",
-                                        "/api/v1/changelog",
+                                        "/api/v1/urls/**",
+                                        "/api/changelog",
                                         "/oauth2/**",
                                         "/login/**",
                                         "/swagger-ui/**",

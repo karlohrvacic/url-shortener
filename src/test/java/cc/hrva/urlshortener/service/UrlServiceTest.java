@@ -3,6 +3,8 @@ package cc.hrva.urlshortener.service;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Optional;
+import tools.jackson.databind.ObjectMapper;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -72,6 +74,12 @@ class UrlServiceTest {
     @Mock
     private UrlToPeekUrlConverter urlToPeekUrlConverter;
 
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
     @BeforeEach
     void setUp() {
         this.urlService = new DefaultUrlService(
@@ -85,7 +93,9 @@ class UrlServiceTest {
                 taskExecutor,
                 urlToPeekUrlConverter,
                 createUrlToUrlConverter,
-                urlUpdateDtoToUrlConverter
+                urlUpdateDtoToUrlConverter,
+                cacheManager,
+                objectMapper
         );
     }
 
