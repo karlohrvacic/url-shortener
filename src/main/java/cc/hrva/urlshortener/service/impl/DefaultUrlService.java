@@ -92,7 +92,9 @@ public class DefaultUrlService implements UrlService {
         setShortUrlForLoggedInUser(url, apiKey);
 
         log.info("Saving URL");
-        return UrlResponse.from(urlRepository.save(url));
+        final var saved = urlRepository.save(url);
+        cacheUrlResponse(saved);
+        return UrlResponse.from(saved);
     }
 
     @Override
@@ -366,6 +368,17 @@ public class DefaultUrlService implements UrlService {
         });
     }
 
+    private void cacheUrlResponse(final Url url) {
+        try {
+            final var cache = cacheManager.getCache("urls");
+            if (cache != null) {
+                cache.put(url.getShortUrl(), UrlResponse.from(url));
+            }
+        } catch (final Exception e) {
+            log.debug("Failed to cache newly created URL", e);
+        }
+    }
+
     @Override
     public String generateShortUrl(final Long length) {
         return RandomStringUtils.random(Math.toIntExact(length), true, true);
@@ -387,6 +400,7 @@ public class DefaultUrlService implements UrlService {
         if (urlRepository.existsUrlByLongUrlAndActiveTrueAndOwnerIsNull(url.getLongUrl())) {
             final var existingLongUrl = getUrlByLongUrl(url.getLongUrl());
             log.warn("Long url already exists in DB, will return URL from long URL {}", existingLongUrl.getShortUrl());
+            cacheUrlResponse(existingLongUrl);
             return existingLongUrl;
         }
 
@@ -396,7 +410,9 @@ public class DefaultUrlService implements UrlService {
         urlValidator.checkIfShortUrlIsReserved(url.getShortUrl());
 
         log.info("Saving URL");
-        return urlRepository.save(url);
+        final var saved = urlRepository.save(url);
+        cacheUrlResponse(saved);
+        return saved;
     }
 
     private ApiKey getApiKey(String key) {
