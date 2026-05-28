@@ -17,11 +17,6 @@ spring:
             client-secret: ${OAUTH2_GOOGLE_CLIENT_SECRET:}
             scope: profile, email
             redirect-uri: https://hrva.cc/login/oauth2/code/google
-          github:
-            client-id: ${OAUTH2_GITHUB_CLIENT_ID:}
-            client-secret: ${OAUTH2_GITHUB_CLIENT_SECRET:}
-            scope: user:email
-            redirect-uri: https://hrva.cc/login/oauth2/code/github
   web:
     error:
       include-message: always

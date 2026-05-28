@@ -52,7 +52,7 @@ class DefaultUrlValidatorTest {
         final Url url = Url.builder().build();
         assertThatThrownBy(() -> urlValidator.longUrlInUrl(url))
                 .isInstanceOf(LongUrlNotSpecifiedException.class)
-                .hasMessage("URL for shortening is not specified");
+                .hasMessage("URL is required");
     }
 
     @Test
@@ -69,6 +69,6 @@ class DefaultUrlValidatorTest {
         when(urlRepository.existsUrlByShortUrlAndActiveTrue(shortUrl)).thenReturn(true);
         assertThatThrownBy(() -> urlValidator.checkIfShortUrlIsUnique(shortUrl))
                 .isInstanceOf(ShortUrlAlreadyExistsException.class)
-                .hasMessage("Short URL is already in use");
+                .hasMessage("This short URL is already taken. Try another.");
     }
 }

@@ -28,12 +28,12 @@ public class DefaultApiKeyValidator implements ApiKeyValidator {
 
         if (apiKey.getApiCallsUsed() >= Optional.ofNullable(apiKey.getApiCallsLimit())
                 .orElse(apiKey.getApiCallsUsed()) + 1) {
-            throw new InvalidApiKeyException("API key exceeded call limit");
+            throw new InvalidApiKeyException("API key call limit reached");
         }
 
         if (LocalDateTime.now().isAfter(Optional.ofNullable(apiKey.getExpirationDate())
                 .orElse(LocalDateTime.now().plusDays(1)))) {
-            throw new InvalidApiKeyException("API key exceeded expiration date");
+            throw new InvalidApiKeyException("API key has expired");
         }
 
         if (!apiKey.isActive()) {
@@ -54,7 +54,7 @@ public class DefaultApiKeyValidator implements ApiKeyValidator {
     @Override
     public void apiKeySlotsAvailable(final User user) {
         if (user.getApiKeySlots() <= apiKeyRepository.findByOwnerAndActiveTrue(user).size()) {
-            throw new ApiKeySlotException("Can't create new API key as it exceeds API key slot limit. Contact admin for bigger slot.");
+            throw new ApiKeySlotException("API key slot limit reached. Contact admin to increase your limit.");
         }
     }
 

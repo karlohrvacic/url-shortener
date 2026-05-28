@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -38,19 +39,46 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errors);
     }
 
+    private static String safeMessage(final Exception ex) {
+        return ex.getMessage() != null ? ex.getMessage() : "Bad request";
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Map<String, String>> handleConstraintViolation(final ConstraintViolationException ex) {
-        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.badRequest().body(buildViolationBody(ex));
+    }
+
+    @ExceptionHandler(TransactionSystemException.class)
+    public ResponseEntity<Map<String, String>> handleTransactionSystem(final TransactionSystemException ex) {
+        Throwable cause = ex.getRootCause();
+        if (cause instanceof ConstraintViolationException cve) {
+            return ResponseEntity.badRequest().body(buildViolationBody(cve));
+        }
+        log.error("Unhandled transaction exception", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Internal server error"));
+    }
+
+    private static Map<String, String> buildViolationBody(final ConstraintViolationException ex) {
+        final var violations = ex.getConstraintViolations();
+        if (violations == null || violations.isEmpty()) {
+            return Map.of("error", safeMessage(ex));
+        }
+        return violations.stream()
+                .collect(Collectors.toMap(
+                        v -> v.getPropertyPath().toString(),
+                        v -> v.getMessage() != null ? v.getMessage() : "Invalid value",
+                        (a, b) -> b));
     }
 
     @ExceptionHandler(UrlNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleNotFound(final UrlNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(NoAuthorizationException.class)
     public ResponseEntity<Map<String, String>> handleUnauthorized(final NoAuthorizationException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -60,32 +88,32 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Map<String, String>> handleApiException(final ApiException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleUserNotFound(final UserNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(ApiKeyNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleApiKeyNotFound(final ApiKeyNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(EmailExistsException.class)
     public ResponseEntity<Map<String, String>> handleEmailExists(final EmailExistsException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(ShortUrlAlreadyExistsException.class)
     public ResponseEntity<Map<String, String>> handleShortUrlExists(final ShortUrlAlreadyExistsException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(InvalidApiKeyException.class)
     public ResponseEntity<Map<String, String>> handleInvalidApiKey(final InvalidApiKeyException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(BadCredentialsException.class)
@@ -95,7 +123,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CommonException.class)
     public ResponseEntity<Map<String, String>> handleCommonException(final CommonException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", safeMessage(ex)));
     }
 
     @ExceptionHandler(Exception.class)

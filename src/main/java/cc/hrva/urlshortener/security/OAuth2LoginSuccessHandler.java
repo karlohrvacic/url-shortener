@@ -58,9 +58,8 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             return;
         }
 
-        final var provider = request.getRequestURI().contains("google") ? "google" : "github";
         final var user = userRepository.findByEmail(email)
-                .orElseGet(() -> createOAuth2User(email, provider));
+                .orElseGet(() -> createOAuth2User(email, "google"));
 
         final var springAuth = new UsernamePasswordAuthenticationToken(
                 user.getEmail(), null,
@@ -79,11 +78,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private String extractEmail(final OAuth2User oAuth2User) {
         final var email = oAuth2User.getAttribute("email");
-        if (email instanceof String) {
-            return (String) email;
-        }
-        // GitHub may not return email directly — check the login attribute
-        return oAuth2User.getAttribute("login");
+        return email instanceof String s ? s : null;
     }
 
     private User createOAuth2User(final String email, final String provider) {
@@ -93,14 +88,12 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                 .authProvider(provider)
                 .authorities(List.of(authoritiesService.getDefaultAuthority()))
                 .apiKeySlots(appProperties.getUserApiKeySlots())
+                .active(true)
                 .build();
 
         final var saved = userRepository.save(newUser);
-        saved.setActive(true);
-        final var activated = userRepository.save(saved);
-
         log.info("Created OAuth2 user email={}", email);
-        return activated;
+        return saved;
     }
 
 }

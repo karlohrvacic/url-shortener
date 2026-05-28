@@ -43,6 +43,7 @@ public class ApiException extends CommonException {
 
     public ApiException(final String message) {
         super(message);
+        this.message = message;
     }
 
     private void addSubError(final ApiSubError subError) {

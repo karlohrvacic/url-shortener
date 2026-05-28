@@ -17,5 +17,6 @@
     <include file="classpath:/db/changelog/table/user_auth_provider.xml"/>
     <include file="classpath:/db/changelog/008-audit-log.xml"/>
     <include file="classpath:/db/changelog/009-email-log.xml"/>
+    <include file="classpath:/db/changelog/010-drop-url-api-key.xml"/>
 
 </databaseChangeLog>

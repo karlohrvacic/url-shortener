@@ -12,7 +12,7 @@ import lombok.Data;
 @AllArgsConstructor
 public class ApiKeyUpdateDto {
 
-    @NotNull(message = "ID of API key can't be null!")
+    @NotNull(message = "API key ID is required")
     @Schema(description = "Unique identifier of the API key to update", example = "1")
     private Long id;
     @Schema(description = "Maximum number of API calls allowed", example = "2000")

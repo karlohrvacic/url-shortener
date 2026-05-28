@@ -45,7 +45,7 @@ class DefaultUserValidatorTest {
 
         assertThatThrownBy(() -> userValidator.checkEmailUniqueness("existing@example.com"))
                 .isInstanceOf(EmailExistsException.class)
-                .hasMessage("Email already exists!");
+                .hasMessage("An account with this email already exists");
     }
 
     @Test

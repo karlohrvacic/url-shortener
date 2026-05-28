@@ -47,7 +47,7 @@ class DefaultUserValidatorShould {
         when(userRepository.existsByEmail(email)).thenReturn(true);
         assertThatThrownBy(() -> userValidator.checkEmailUniqueness(email))
                 .isInstanceOf(EmailExistsException.class)
-                .hasMessage("Email already exists!");
+                .hasMessage("An account with this email already exists");
     }
 
 }

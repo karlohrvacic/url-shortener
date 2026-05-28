@@ -16,7 +16,7 @@ public class DefaultAuthValidator implements AuthValidator {
     @Override
     public void passwordMatchesCurrentPassword(final User user, final String password) {
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new NoAuthorizationException("Password doesn't match existing password");
+            throw new NoAuthorizationException("Current password is incorrect");
         }
     }
 

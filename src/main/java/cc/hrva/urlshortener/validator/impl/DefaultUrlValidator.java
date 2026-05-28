@@ -22,26 +22,28 @@ public class DefaultUrlValidator implements UrlValidator {
     private final AppProperties appProperties;
     private final SafeBrowsingService safeBrowsingService;
 
-    private static final List<String> RESERVED_PREFIXES = List.of("api");
+    private static final List<String> RESERVED_WORDS = List.of(
+            "api", "login", "logout", "oauth2", "actuator", "error",
+            "swagger-ui", "v3", "webjars", "auth");
 
     @Override
     public void longUrlInUrl(final Url url) {
         if (url.getLongUrl() == null) {
-            throw new LongUrlNotSpecifiedException("URL for shortening is not specified");
+            throw new LongUrlNotSpecifiedException("URL is required");
         }
     }
 
     @Override
     public void checkIfShortUrlIsUnique(final String shortUrl) {
         if (urlRepository.existsUrlByShortUrlAndActiveTrue(shortUrl)) {
-            throw new ShortUrlAlreadyExistsException("Short URL is already in use");
+            throw new ShortUrlAlreadyExistsException("This short URL is already taken. Try another.");
         }
     }
 
     @Override
     public void checkIfShortUrlIsReserved(final String shortUrl) {
-        if (shortUrl != null && RESERVED_PREFIXES.stream().anyMatch(shortUrl::startsWith)) {
-            throw new ShortUrlAlreadyExistsException("Short URL can't start with reserved prefix: " + shortUrl);
+        if (shortUrl != null && RESERVED_WORDS.contains(shortUrl.toLowerCase())) {
+            throw new ShortUrlAlreadyExistsException("This short URL is reserved. Try another.");
         }
     }
 
@@ -66,14 +68,14 @@ public class DefaultUrlValidator implements UrlValidator {
     @Override
     public void checkIfUrlSafe(final Url url) {
         if (!safeBrowsingService.checkUrlsForThreats(url.getLongUrl()).isEmpty()) {
-            throw new UrlValidationException("Bad URL detected");
+            throw new UrlValidationException("This URL was flagged as unsafe and cannot be shortened");
         }
     }
 
     @Override
     public void checkIfAnonymousUrlCreationEnabled() {
         if (!appProperties.isAnonymousUrlCreationEnabled()) {
-            throw new ApiException("Url creation for anonymous users is currently disabled");
+            throw new ApiException("Sign in to create short URLs");
         }
     }
 

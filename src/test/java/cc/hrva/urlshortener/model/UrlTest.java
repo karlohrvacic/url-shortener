@@ -50,13 +50,11 @@ class UrlTest {
     @Test
     void shouldClearForAnonymousUser() {
         final var owner = User.builder().id(1L).build();
-        final var apiKey = ApiKey.builder().id(1L).build();
-        final var url = Url.builder().owner(owner).apiKey(apiKey).build();
+        final var url = Url.builder().owner(owner).build();
 
         url.clearForAnonymousUser();
 
         assertThat(url.getOwner()).isNull();
-        assertThat(url.getApiKey()).isNull();
     }
 
     @Test

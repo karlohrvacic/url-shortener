@@ -18,7 +18,7 @@ public class DefaultUserValidator implements UserValidator {
     @Override
     public void checkEmailUniqueness(final String email) {
         if (userRepository.existsByEmail(email)) {
-            throw new EmailExistsException("Email already exists!");
+            throw new EmailExistsException("An account with this email already exists");
         }
     }
 

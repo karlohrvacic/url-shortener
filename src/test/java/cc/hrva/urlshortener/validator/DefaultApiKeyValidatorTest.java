@@ -106,7 +106,7 @@ class DefaultApiKeyValidatorTest {
 
         assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
                 .isInstanceOf(InvalidApiKeyException.class)
-                .hasMessage("API key exceeded call limit");
+                .hasMessage("API key call limit reached");
     }
 
     @Test
@@ -118,7 +118,7 @@ class DefaultApiKeyValidatorTest {
 
         assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
                 .isInstanceOf(InvalidApiKeyException.class)
-                .hasMessage("API key exceeded expiration date");
+                .hasMessage("API key has expired");
     }
 
     @Test

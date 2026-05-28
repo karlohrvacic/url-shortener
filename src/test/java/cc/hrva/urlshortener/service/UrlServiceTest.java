@@ -141,11 +141,13 @@ class UrlServiceTest {
         final var createUrlDto = CreateUrlDto.builder().shortUrl("").build();
         final var url = Url.builder().shortUrl("").build();
         final var api = "apikey";
-        final var apiKey = ApiKey.builder().build();
+        final var owner = User.builder().id(1L).build();
+        final var apiKey = ApiKey.builder().owner(owner).build();
 
         when(urlRepository.save(url)).thenReturn(url);
         when(apiKeyService.fetchApiKeyByKey(api)).thenReturn(apiKey);
         when(createUrlToUrlConverter.convert(createUrlDto)).thenReturn(url);
+        when(appProperties.getShortUrlLength()).thenReturn(1L);
 
         final var result = urlService.saveUrlWithApiKey(createUrlDto, api);
         assertThat(result).isInstanceOf(UrlResponse.class);
@@ -251,22 +253,21 @@ class UrlServiceTest {
     }
 
     @Test
-    void shouldSaveUrlWithApiKeyWithFirstApiKeyForLoggedInUser() {
+    void shouldSaveUrlForLoggedInUserWithoutApiKey() {
         final var createUrlDto = CreateUrlDto.builder().shortUrl("").build();
         final var url = Url.builder().shortUrl("").build();
-        final var apiKey = ApiKey.builder().id(1L).key("key").apiCallsUsed(0L).apiCallsLimit(10L).active(true).build();
-        final var user = User.builder().id(1L).apiKeys(Collections.singletonList(apiKey)).build();
+        final var user = User.builder().id(1L).build();
 
         when(createUrlToUrlConverter.convert(createUrlDto)).thenReturn(url);
         when(userService.getUserFromToken()).thenReturn(user);
         when(urlRepository.save(url)).thenReturn(url);
         when(appProperties.getShortUrlLength()).thenReturn(1L);
 
-        final var result = urlService.saveUrlWithApiKey(createUrlDto, null);
+        final var result = urlService.saveUrlRouting(createUrlDto);
         assertThat(result).isInstanceOf(UrlResponse.class);
 
-        verify(apiKeyValidator).apiKeyExistsByKeyAndIsValid("key");
-        verify(apiKeyService).apiKeyUseAction(any(ApiKey.class));
+        verify(apiKeyValidator, org.mockito.Mockito.never()).apiKeyExistsByKeyAndIsValid(any());
+        verify(apiKeyService, org.mockito.Mockito.never()).apiKeyUseAction(any(ApiKey.class));
     }
 
     @Test

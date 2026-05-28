@@ -1,10 +1,49 @@
 {
   "releases": [
     {
-      "version": "v2.1",
-      "date": "2026-05-17",
+      "version": "v2.2",
+      "date": "2026-05-28",
       "badge": "Latest",
       "badgeVariant": "default",
+      "summary": "URL creation reliability, clearer errors, hardened validation.",
+      "sections": [
+        {
+          "title": "URL Creation Fixes",
+          "icon": "link",
+          "description": "Bare domains and pasted whitespace no longer break URL creation.",
+          "items": [
+            "Auto-prepend https:// when the scheme is missing (e.g. test.gmail.com → https://test.gmail.com).",
+            "Trim leading/trailing whitespace on submitted URLs.",
+            "Persist-time validation failures now return 400 with a field-level error instead of 500.",
+            "Friendlier, end-user-oriented validation messages across the API."
+          ]
+        },
+        {
+          "title": "Routing & Safety Hardening",
+          "icon": "shield",
+          "items": [
+            "Reserved-word check for custom short URLs now matches exactly (case-insensitive) instead of prefix-match, so loginpage and apifoo are valid again.",
+            "Expanded reserved list: api, login, logout, oauth2, actuator, error, swagger-ui, v3, webjars, auth.",
+            "Bot probes (.env, favicon.ico, robots.txt, wp-login.php, etc.) return 404 silently — no log, no DB hit, no metric.",
+            "Custom short URL alias validated against ^[a-zA-Z0-9_-]*$ with 32-char cap.",
+            "Safe Browsing failures now log loudly with ALERT prefix; new app.safe-browsing-fail-closed flag to fail-closed when the API is unreachable."
+          ]
+        },
+        {
+          "title": "Auth & Config",
+          "icon": "key",
+          "items": [
+            "Removed GitHub as an OAuth2 SSO provider. Google remains.",
+            "Short URL generation now uses RandomStringUtils.secureStrong() (SecureRandom) instead of the deprecated Math.random()-backed API.",
+            "OAuth2 user creation now persists once with active=true instead of INSERT + UPDATE.",
+            "app.google-api.key now bound to GOOGLE_SAFE_BROWSING_KEY env var."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "v2.1",
+      "date": "2026-05-17",
       "summary": "Search & filter your links, refined UX, better testing.",
       "sections": [
         {

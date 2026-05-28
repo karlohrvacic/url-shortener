@@ -25,8 +25,8 @@ public class Url {
     @GeneratedValue(generator = "url_id_seq", strategy = GenerationType.SEQUENCE)
     private Long id;
 
-    @URL(message = "Long URL not valid")
-    @NotBlank(message = "You need to add url for shortening")
+    @URL(message = "Enter a valid URL (e.g. https://example.com)")
+    @NotBlank(message = "URL is required")
     private String longUrl;
 
     @Column(unique = true)
@@ -34,9 +34,6 @@ public class Url {
 
     @ManyToOne
     private User owner;
-
-    @ManyToOne
-    private ApiKey apiKey;
 
     private LocalDateTime createDate;
     private LocalDateTime lastAccessed;
@@ -78,7 +75,6 @@ public class Url {
 
     public void clearForAnonymousUser() {
         this.owner = null;
-        this.apiKey = null;
     }
 
 }

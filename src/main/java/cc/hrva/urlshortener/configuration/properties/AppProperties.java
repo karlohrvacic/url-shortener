@@ -76,5 +76,6 @@ public class AppProperties {
 
     private boolean registrationEnabled = true;
     private boolean anonymousUrlCreationEnabled = true;
+    private boolean safeBrowsingFailClosed = false;
 
 }

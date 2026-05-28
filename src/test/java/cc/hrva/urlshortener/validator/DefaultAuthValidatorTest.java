@@ -45,6 +45,6 @@ class DefaultAuthValidatorTest {
 
         assertThatThrownBy(() -> authValidator.passwordMatchesCurrentPassword(user, "wrongPassword"))
                 .isInstanceOf(NoAuthorizationException.class)
-                .hasMessage("Password doesn't match existing password");
+                .hasMessage("Current password is incorrect");
     }
 }

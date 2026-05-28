@@ -46,12 +46,18 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Slf4j
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class DefaultUrlService implements UrlService {
+
+    private static final Set<String> BOT_PROBE_PATHS = Set.of(
+            "favicon.ico", "favicon.png", "robots.txt", "sitemap.xml",
+            ".env", ".git", ".ds_store", "wp-login.php", "wp-admin",
+            "xmlrpc.php", "phpinfo.php", "config.json", ".well-known");
 
     private final UserService userService;
     private final UrlValidator urlValidator;
@@ -72,15 +78,14 @@ public class DefaultUrlService implements UrlService {
     @Transactional
     public UrlResponse saveUrlRouting(final @Valid CreateUrlDto createUrlDto) {
         final var url = createUrlToUrlConverter.convert(createUrlDto);
+        final var currentUser = userService.getUserFromToken();
 
-        log.info("Creating URL longUrl={} authenticated={}", createUrlDto.getLongUrl(), userService.getUserFromToken() != null);
+        log.info("Creating URL longUrl={} authenticated={}", createUrlDto.getLongUrl(), currentUser != null);
 
-        urlValidator.longUrlInUrl(url);
-        urlValidator.checkIfUrlSafe(url);
-        urlValidator.checkIfUrlExpirationDateIsInThePast(url);
+        validateUrl(url);
 
-        if (userService.getUserFromToken() != null) {
-            return saveUrlWithApiKey(createUrlDto, null);
+        if (currentUser != null) {
+            return saveUrlForUser(url, currentUser);
         }
         return UrlResponse.from(createUrlForAnonymousUser(url));
     }
@@ -92,13 +97,38 @@ public class DefaultUrlService implements UrlService {
 
         log.info("Creating URL with API key longUrl={}", createUrlDto.getLongUrl());
 
-        final var apiKey = getApiKey(key);
-        setShortUrlForLoggedInUser(url, apiKey);
+        validateUrl(url);
 
-        log.info("Saving URL");
+        final var apiKey = apiKeyService.fetchApiKeyByKey(key);
+        apiKeyValidator.apiKeyExistsByKeyAndIsValid(key);
+        apiKeyService.apiKeyUseAction(apiKey);
+
+        return saveUrlForUser(url, apiKey.getOwner());
+    }
+
+    private UrlResponse saveUrlForUser(final Url url, final User owner) {
+        assignShortUrl(url);
+        url.setOwner(owner);
+
+        log.info("Saving URL for owner id={}", owner.getId());
         final var saved = urlRepository.save(url);
         cacheUrlResponse(saved);
         return UrlResponse.from(saved);
+    }
+
+    private void validateUrl(final Url url) {
+        urlValidator.longUrlInUrl(url);
+        urlValidator.checkIfUrlSafe(url);
+        urlValidator.checkIfUrlExpirationDateIsInThePast(url);
+    }
+
+    private void assignShortUrl(final Url url) {
+        if (StringUtils.isEmpty(url.getShortUrl())) {
+            url.setShortUrl(generateShortUrl(appProperties.getShortUrlLength()));
+            log.info("URL got generated short URL {}", url.getShortUrl());
+        }
+        urlValidator.checkIfShortUrlIsUnique(url.getShortUrl());
+        urlValidator.checkIfShortUrlIsReserved(url.getShortUrl());
     }
 
     @Override
@@ -290,6 +320,10 @@ public class DefaultUrlService implements UrlService {
 
     @Override
     public RedirectView redirectResultUrl(final String shortUrl, final String clientIP) {
+        if (shortUrl != null && BOT_PROBE_PATHS.contains(shortUrl.toLowerCase())) {
+            throw new UrlNotFoundException("URL doesn't exist");
+        }
+
         final var sample = Timer.start(meterRegistry);
         log.info("Redirect shortUrl={} clientIP={}", shortUrl, clientIP);
 
@@ -415,7 +449,7 @@ public class DefaultUrlService implements UrlService {
 
     @Override
     public String generateShortUrl(final Long length) {
-        return RandomStringUtils.random(Math.toIntExact(length), true, true);
+        return RandomStringUtils.secureStrong().nextAlphanumeric(Math.toIntExact(length));
     }
 
     private Url findUrlByShortUrlAndActive(final String shortUrl) {
@@ -449,18 +483,6 @@ public class DefaultUrlService implements UrlService {
         return saved;
     }
 
-    private ApiKey getApiKey(final String key) {
-        if (StringUtils.isNotEmpty(key)) {
-            final var apiKey = apiKeyService.fetchApiKeyByKey(key);
-            apiKeyValidator.apiKeyExistsByKeyAndIsValid(key);
-            return apiKey;
-        }
-
-        final var apiKey = getFirstApiKeyForLoggedInUser();
-        apiKeyValidator.apiKeyExistsByKeyAndIsValid(apiKey.getKey());
-        return apiKey;
-    }
-
     private void asyncCheckIfVisitUnique(final String clientIP, final Url url) {
         applicationTaskExecutor.execute(() -> {
             if (!ipAddressService.urlAlreadyVisitedByIP(url, clientIP)) {
@@ -471,35 +493,6 @@ public class DefaultUrlService implements UrlService {
 
     private void incrementVisitForUrl(final Url url) {
         urlRepository.save(url.onVisit());
-    }
-
-    private void setShortUrlForLoggedInUser(final @Valid Url url, final ApiKey apiKey) {
-        log.info("Setting short URL");
-
-        if (StringUtils.isEmpty(url.getShortUrl())) {
-            url.setShortUrl(generateShortUrl(appProperties.getShortUrlLength()));
-            log.info("URL got generated short URL {}", url.getShortUrl());
-        }
-
-        urlValidator.checkIfShortUrlIsUnique(url.getShortUrl());
-        urlValidator.checkIfShortUrlIsReserved(url.getShortUrl());
-
-        url.setApiKey(apiKey);
-        url.setOwner(apiKey.getOwner());
-        apiKeyService.apiKeyUseAction(apiKey);
-
-        log.info("URL is created with API key and is keeping custom short url: {}", url.getShortUrl());
-    }
-
-    private ApiKey getFirstApiKeyForLoggedInUser() {
-        log.info("User is authenticated but didn't pass API key");
-
-        final var user = userService.getUserFromToken();
-        return user.getApiKeys()
-                .stream()
-                .filter(ApiKey::isActive)
-                .findFirst()
-                .orElseGet(() -> apiKeyService.findApiKeyByKey(apiKeyService.generateNewApiKey().key()));
     }
 
     public Url deactivateUrl(final Url url) {

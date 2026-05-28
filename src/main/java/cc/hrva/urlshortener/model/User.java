@@ -28,12 +28,12 @@ public class User {
     @GeneratedValue(generator = "user_account_id_seq", strategy = GenerationType.SEQUENCE)
     private Long id;
 
-    @NotBlank(message = "You need to enter email")
-    @Email(message = "Email not valid")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Enter a valid email address (e.g. you@example.com)")
     private String email;
 
-    @NotBlank(message = "You need to enter password")
-    @Length(min = 8, message = "Password needs to be at least 8 characters long")
+    @NotBlank(message = "Password is required")
+    @Length(min = 8, message = "Password must be at least 8 characters long")
     private String password;
 
     @JsonIgnore
