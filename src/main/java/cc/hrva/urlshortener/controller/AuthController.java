@@ -3,7 +3,9 @@ package cc.hrva.urlshortener.controller;
 import cc.hrva.urlshortener.dto.*;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.service.AuthService;
+import cc.hrva.urlshortener.service.TwoFactorService;
 import cc.hrva.urlshortener.service.UserService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +26,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final TwoFactorService twoFactorService;
     private final HttpServletRequest request;
 
     @Operation(summary = "Register a new user", description = "Create a new user account with email and password.")
@@ -54,7 +57,50 @@ public class AuthController {
         return ResponseEntity.ok(userService.resetPassword(passwordResetDto));
     }
 
-    @Operation(summary = "Login", description = "Authenticate with email and password and receive a JWT token.")
+    @Operation(summary = "Verify email", description = "Confirm a user's email address using the token sent at registration.")
+    @ApiResponse(responseCode = "400", description = "Token invalid or expired")
+    @PostMapping("/verify-email/confirm")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody final VerifyEmailDto dto) {
+        log.info("Verify email controller invoked");
+        authService.verifyEmail(dto.getToken());
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Resend verification email", description = "Resend the email verification link to the given address.")
+    @PostMapping("/verify-email/resend")
+    public ResponseEntity<Void> resendVerificationEmail(@Valid @RequestBody final ResendVerificationDto dto) {
+        log.info("Resend verification email controller invoked for {}", dto.getEmail());
+        authService.resendVerificationEmail(dto.getEmail());
+
+        return ResponseEntity.accepted().build();
+    }
+
+    @Operation(summary = "Start 2FA setup", description = "Generate a TOTP secret and otpauth URI for the authenticated user to scan. Local accounts only.")
+    @PostMapping("/2fa/setup")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_USER')")
+    public ResponseEntity<TwoFactorSetupResponse> setupTwoFactor() {
+        return ResponseEntity.ok(twoFactorService.setup());
+    }
+
+    @Operation(summary = "Enable 2FA", description = "Confirm the TOTP code to enable 2FA and receive one-time recovery codes.")
+    @ApiResponse(responseCode = "400", description = "Invalid code or setup not started")
+    @PostMapping("/2fa/enable")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_USER')")
+    public ResponseEntity<TwoFactorEnableResponse> enableTwoFactor(@Valid @RequestBody final TwoFactorCodeDto dto) {
+        return ResponseEntity.ok(twoFactorService.enable(dto.getCode()));
+    }
+
+    @Operation(summary = "Disable 2FA", description = "Disable 2FA using a current TOTP or recovery code.")
+    @ApiResponse(responseCode = "400", description = "Invalid code or 2FA not enabled")
+    @PostMapping("/2fa/disable")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_USER')")
+    public ResponseEntity<Void> disableTwoFactor(@Valid @RequestBody final TwoFactorCodeDto dto) {
+        twoFactorService.disable(dto.getCode());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Login", description = "Authenticate with email and password and receive a JWT token. If 2FA is enabled, resubmit with a code.")
     @ApiResponse(responseCode = "401", description = "Bad credentials")
     @PostMapping("/login")
     public ResponseEntity<JWTTokenDto> login(@Valid @RequestBody final LoginDto login) {

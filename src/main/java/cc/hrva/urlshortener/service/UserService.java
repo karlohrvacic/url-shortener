@@ -1,5 +1,6 @@
 package cc.hrva.urlshortener.service;
 
+import cc.hrva.urlshortener.dto.DataExportDto;
 import cc.hrva.urlshortener.dto.DeleteAccountDto;
 import cc.hrva.urlshortener.dto.PasswordResetDto;
 import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
@@ -20,6 +21,7 @@ public interface UserService {
     void persistUser(User user);
     void deleteUserById(Long id);
     void deleteOwnAccount(DeleteAccountDto deleteAccountDto);
+    DataExportDto exportMyData();
     void userHasLoggedIn(User user);
     void deactivateUnusedUserAccounts();
     User fetchUserFromEmail(String email);

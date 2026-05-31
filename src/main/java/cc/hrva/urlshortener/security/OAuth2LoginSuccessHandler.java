@@ -102,6 +102,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                 .authorities(List.of(authoritiesService.getDefaultAuthority()))
                 .apiKeySlots(appProperties.getUserApiKeySlots())
                 .active(true)
+                .emailVerified(true)
                 .build();
 
         final var saved = userRepository.save(newUser);

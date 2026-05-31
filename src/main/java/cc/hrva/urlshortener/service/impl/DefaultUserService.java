@@ -3,8 +3,11 @@ package cc.hrva.urlshortener.service.impl;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.converter.UserToUserDtoConverter;
 import cc.hrva.urlshortener.converter.UserUpdateDtoToUserConverter;
+import cc.hrva.urlshortener.dto.ApiKeyResponse;
+import cc.hrva.urlshortener.dto.DataExportDto;
 import cc.hrva.urlshortener.dto.DeleteAccountDto;
 import cc.hrva.urlshortener.dto.PasswordResetDto;
+import cc.hrva.urlshortener.dto.UrlResponse;
 import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
@@ -16,10 +19,14 @@ import cc.hrva.urlshortener.exception.UserNotFoundException;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.ApiKeyRepository;
+import cc.hrva.urlshortener.repository.EmailLogRepository;
 import cc.hrva.urlshortener.repository.IPAddressRepository;
 import cc.hrva.urlshortener.repository.ResetTokenRepository;
+import cc.hrva.urlshortener.repository.TwoFactorRecoveryCodeRepository;
 import cc.hrva.urlshortener.repository.UrlRepository;
 import cc.hrva.urlshortener.repository.UserRepository;
+import cc.hrva.urlshortener.repository.VerificationTokenRepository;
+import cc.hrva.urlshortener.service.VerificationTokenService;
 import cc.hrva.urlshortener.repository.specification.UserSpecification;
 import cc.hrva.urlshortener.service.ResetTokenService;
 import cc.hrva.urlshortener.service.UserService;
@@ -50,11 +57,15 @@ public class DefaultUserService implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApiKeyRepository apiKeyRepository;
+    private final EmailLogRepository emailLogRepository;
     private final IPAddressRepository ipAddressRepository;
     private final ResetTokenService resetTokenService;
     private final ResetTokenRepository resetTokenRepository;
+    private final TwoFactorRecoveryCodeRepository twoFactorRecoveryCodeRepository;
     private final UserToUserDtoConverter userToUserDtoConverter;
     private final DefaultSendingEmailService sendingEmailService;
+    private final VerificationTokenService verificationTokenService;
+    private final VerificationTokenRepository verificationTokenRepository;
     private final UserUpdateDtoToUserConverter userUpdateDtoToUserConverter;
 
     @Override
@@ -62,7 +73,9 @@ public class DefaultUserService implements UserService {
     public User register(final User user) {
         final var savedUser = userRepository.save(user);
         log.info("User registered email={}", savedUser.getEmail());
-        sendingEmailService.sendWelcomeEmail(savedUser);
+
+        final var verificationToken = verificationTokenService.createTokenForUser(savedUser);
+        sendingEmailService.sendVerificationEmail(savedUser, verificationToken);
         sendingEmailService.sendNewUserNotificationToAdmin(savedUser);
 
         return savedUser;
@@ -150,12 +163,40 @@ public class DefaultUserService implements UserService {
         deleteUserAndOwnedData(user);
     }
 
+    @Override
+    public DataExportDto exportMyData() {
+        final var user = getUserFromToken();
+        if (user == null) {
+            throw new NoAuthorizationException("Not authenticated");
+        }
+        log.info("Data export requested by user id={}", user.getId());
+
+        final var urls = urlRepository.findByOwner(user).stream()
+                .map(UrlResponse::from)
+                .toList();
+        final var apiKeys = apiKeyRepository.findByOwner(user).stream()
+                .map(ApiKeyResponse::from)
+                .toList();
+        final var emails = emailLogRepository.findByRecipientContainingIgnoreCase(user.getEmail()).stream()
+                .map(log -> new DataExportDto.EmailExport(log.getSubject(), log.getStatus(), log.getSentAt(), log.getCreatedAt()))
+                .toList();
+
+        return new DataExportDto(
+                LocalDateTime.now(),
+                userToUserDtoConverter.convert(user),
+                urls,
+                apiKeys,
+                emails);
+    }
+
     private void deleteUserAndOwnedData(final User user) {
         final var urls = urlRepository.findByOwner(user);
         if (!urls.isEmpty()) {
             ipAddressRepository.deleteByUrlIn(urls);
         }
         resetTokenRepository.deleteByUser(user);
+        verificationTokenRepository.deleteByUser(user);
+        twoFactorRecoveryCodeRepository.deleteByUser(user);
         urlRepository.deleteByOwner(user);
         // API keys are removed via CascadeType.ALL on User.apiKeys when the user is deleted.
         userRepository.delete(user);

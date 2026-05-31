@@ -25,6 +25,7 @@ public class UserRegisterDtoToUserConverter implements Converter<UserRegisterDto
                 .password(passwordEncoder.encode(userRegisterDto.getPassword()))
                 .authorities(List.of(authoritiesService.getDefaultAuthority()))
                 .apiKeySlots(appProperties.getUserApiKeySlots())
+                .emailVerified(false)
                 .build();
     }
 

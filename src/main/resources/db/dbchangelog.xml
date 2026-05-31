@@ -18,5 +18,8 @@
     <include file="classpath:/db/changelog/008-audit-log.xml"/>
     <include file="classpath:/db/changelog/009-email-log.xml"/>
     <include file="classpath:/db/changelog/010-drop-url-api-key.xml"/>
+    <include file="classpath:/db/changelog/013-email-verification.xml"/>
+    <include file="classpath:/db/changelog/014-url-tags.xml"/>
+    <include file="classpath:/db/changelog/015-two-factor.xml"/>
 
 </databaseChangeLog>

@@ -9,6 +9,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -25,5 +27,8 @@ public interface UrlRepository extends JpaRepository<Url, Long>, JpaSpecificatio
     long countByActiveTrue();
     List<Url> findByOwner(User owner);
     void deleteByOwner(User owner);
+
+    @Query("select distinct t from Url u join u.tags t where u.owner = :owner order by t")
+    List<String> findDistinctTagsByOwner(@Param("owner") User owner);
 
 }

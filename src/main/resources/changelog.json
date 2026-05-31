@@ -1,10 +1,46 @@
 {
   "releases": [
     {
-      "version": "v2.2",
-      "date": "2026-05-28",
+      "version": "v2.3",
+      "date": "2026-05-31",
       "badge": "Latest",
       "badgeVariant": "default",
+      "summary": "Email verification, two-factor auth, account self-service, analytics, and URL tags.",
+      "sections": [
+        {
+          "title": "Accounts & Security",
+          "icon": "shield",
+          "items": [
+            "Email verification on registration — new accounts must confirm their email before signing in (existing users grandfathered, Google accounts auto-verified).",
+            "Two-factor authentication (TOTP) for password accounts, with one-time recovery codes and a second login step.",
+            "Account active status now enforced everywhere: deactivated users are blocked at login and per-request.",
+            "Self-service account deletion (password-confirmed) that removes the user and all their URLs and API keys.",
+            "Deactivating a user now revokes their API keys; an API key works only while both the key and its owner are active."
+          ]
+        },
+        {
+          "title": "URLs & Analytics",
+          "icon": "link",
+          "items": [
+            "URL tags — organize links with tags, filter by tag, see them on the dashboard.",
+            "Per-URL and overview click analytics (visits, unique recent visitors, new-visitor trend).",
+            "URL and API-key status now shows the real reason: Active, Expired, Limit reached, Revoked, Deactivated, or Blocked."
+          ]
+        },
+        {
+          "title": "Admin & Privacy",
+          "icon": "key",
+          "items": [
+            "Download-my-data export (profile, URLs, API keys, emails) as JSON.",
+            "Admin gets notified by email when a new user registers; dashboard shows new-user counts (7d / 30d).",
+            "Admin-only endpoints are hidden from the public API docs."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "v2.2",
+      "date": "2026-05-28",
       "summary": "URL creation reliability, clearer errors, hardened validation.",
       "sections": [
         {

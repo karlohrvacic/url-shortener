@@ -79,6 +79,33 @@ class UrlUpdateDtoToUrlConverterTest {
     }
 
     @Test
+    void shouldReplaceTagsWhenProvided() {
+        final var existingUrl = Url.builder().id(1L).longUrl("https://example.com")
+                .tags(new java.util.LinkedHashSet<>(java.util.List.of("old"))).build();
+        final var updateDto = UrlUpdateDto.builder().id(1L)
+                .tags(new java.util.LinkedHashSet<>(java.util.List.of("New", "fresh"))).build();
+
+        when(urlRepository.findById(anyLong())).thenReturn(Optional.of(existingUrl));
+
+        final var result = converter.convert(updateDto);
+
+        assertThat(result.getTags()).containsExactlyInAnyOrder("new", "fresh");
+    }
+
+    @Test
+    void shouldLeaveTagsUnchangedWhenNull() {
+        final var existingUrl = Url.builder().id(1L).longUrl("https://example.com")
+                .tags(new java.util.LinkedHashSet<>(java.util.List.of("keep"))).build();
+        final var updateDto = UrlUpdateDto.builder().id(1L).build();
+
+        when(urlRepository.findById(anyLong())).thenReturn(Optional.of(existingUrl));
+
+        final var result = converter.convert(updateDto);
+
+        assertThat(result.getTags()).containsExactly("keep");
+    }
+
+    @Test
     void shouldFailWhenUrlNotFound() {
         final var updateDto = UrlUpdateDto.builder().id(1L).build();
 

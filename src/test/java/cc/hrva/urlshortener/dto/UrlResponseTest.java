@@ -47,4 +47,15 @@ class UrlResponseTest {
     void shouldBeDeactivated() {
         assertThat(UrlResponse.from(baseUrl().active(false).build()).status()).isEqualTo("DEACTIVATED");
     }
+
+    @Test
+    void shouldIncludeTags() {
+        final var url = baseUrl().active(true).tags(new java.util.LinkedHashSet<>(java.util.List.of("work"))).build();
+        assertThat(UrlResponse.from(url).tags()).containsExactly("work");
+    }
+
+    @Test
+    void shouldDefaultTagsToEmptyWhenNull() {
+        assertThat(UrlResponse.from(baseUrl().active(true).build()).tags()).isEmpty();
+    }
 }

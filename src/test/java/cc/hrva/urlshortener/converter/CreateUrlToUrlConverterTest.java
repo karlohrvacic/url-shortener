@@ -40,5 +40,18 @@ class CreateUrlToUrlConverterTest {
         assertThat(url.getShortUrl()).isNull();
         assertThat(url.getVisitLimit()).isNull();
         assertThat(url.getExpirationDate()).isNull();
+        assertThat(url.getTags()).isEmpty();
+    }
+
+    @Test
+    void shouldNormalizeTags() {
+        final var createUrlDto = CreateUrlDto.builder()
+                .longUrl("https://example.com")
+                .tags(new java.util.LinkedHashSet<>(java.util.List.of("Work", " work ", "BIG")))
+                .build();
+
+        final var url = converter.convert(createUrlDto);
+
+        assertThat(url.getTags()).containsExactlyInAnyOrder("work", "big");
     }
 }

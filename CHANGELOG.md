@@ -4,6 +4,30 @@ All notable changes to hrva.cc — the URL shortener.
 
 ---
 
+## [v2.3] — 2026-05-31
+
+### ✨ Added
+- **Email verification** — new registrations must confirm their email before login; resend supported. Existing users grandfathered as verified; Google accounts auto-verified.
+- **Two-factor authentication (TOTP)** — enroll an authenticator app (QR), confirm a code, receive one-time recovery codes. Login gains a second step. Local accounts only.
+- **Account self-service** — delete your account (password-confirmed) along with all your URLs and API keys; download all your data as JSON (GDPR).
+- **URL tags** — tag links, filter by tag, manage tags on create/edit.
+- **Click analytics** — per-URL and overview analytics (visits, unique recent visitors, 30-day new-visitor trend).
+- **Admin signup email + stats** — admin notified on new registrations; dashboard shows new-user counts (7d / 30d).
+
+### 🔒 Security
+- `active` flag now enforced at login (password + OAuth) and per-request; deactivating a user revokes their API keys.
+- API keys are valid only while both the key and its owner are active.
+- Admin-only endpoints hidden from the public API docs.
+
+### 🎨 Improved
+- URL and API-key status now reflects the real reason (Active / Expired / Limit reached / Revoked / Deactivated / Blocked) instead of a generic "Revoked".
+- Fixed Google sign-in requiring two attempts; fixed the admin user deactivate-toggle 500.
+
+### 🧪 Testing
+- Backend test suite expanded to cover verification, 2FA, analytics, tags, self-delete, and status logic.
+
+---
+
 ## [v2.1] — 2026-05-17
 
 ### ✨ Added

@@ -26,6 +26,13 @@ public final class UrlSpecification {
         return (root, query, cb) -> cb.equal(root.get("active"), active);
     }
 
+    public static Specification<Url> hasTag(final String tag) {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            return cb.equal(root.join("tags"), tag.trim().toLowerCase());
+        };
+    }
+
     public static Specification<Url> isExpired() {
         return (root, query, cb) ->
                 cb.and(

@@ -88,6 +88,27 @@ public class DefaultSendingEmailService implements SendingEmailService {
 
     @Override
     @Async
+    public void sendVerificationEmail(final User user, final cc.hrva.urlshortener.model.VerificationToken token) {
+        final var ctx = getContext(user);
+        ctx.setVariable("token", token.getToken());
+        ctx.setVariable("full_verification_link",
+                MessageFormat.format("{0}/verify-email/{1}", appProperties.getFrontendUrl(), token.getToken()));
+        ctx.setVariable("token_expiration", appProperties.getVerificationTokenExpirationInHours().toString());
+
+        final var htmlContent = templateEngine.process("verify_email", ctx);
+
+        final var email = Email.builder()
+                .sender(appProperties.getEmailSenderAddress())
+                .receivers(new String[]{user.getEmail()})
+                .subject("Verify your email")
+                .text(htmlContent)
+                .build();
+
+        tryToSendEmail(email);
+    }
+
+    @Override
+    @Async
     public void sendNewUserNotificationToAdmin(final User user) {
         final var provider = user.getAuthProvider() != null ? user.getAuthProvider() : "local";
         final var body = """

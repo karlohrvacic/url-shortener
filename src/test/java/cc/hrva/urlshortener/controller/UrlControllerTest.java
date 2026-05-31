@@ -146,6 +146,15 @@ class UrlControllerTest {
     }
 
     @Test
+    void shouldGetMyTags() throws Exception {
+        when(urlService.getMyTags(null)).thenReturn(java.util.List.of("work", "campaign"));
+
+        mockMvc.perform(get("/api/v1/urls/tags"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("work"));
+    }
+
+    @Test
     void shouldGetAllUrls() throws Exception {
         final var url = Url.builder().id(1L).build();
         final var urlResponse = UrlResponse.from(url);

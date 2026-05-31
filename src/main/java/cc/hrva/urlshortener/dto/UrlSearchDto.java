@@ -14,6 +14,7 @@ public class UrlSearchDto {
     private String search;
     private Boolean active;
     private Boolean expired;
+    private String tag;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime dateFrom;

@@ -153,8 +153,17 @@ public class DefaultUrlService implements UrlService {
         if (search.getDateTo() != null) {
             spec = spec.and(UrlSpecification.createdBefore(search.getDateTo()));
         }
+        if (StringUtils.isNotEmpty(search.getTag())) {
+            spec = spec.and(UrlSpecification.hasTag(search.getTag()));
+        }
 
         return urlRepository.findAll(spec, pageable).map(UrlResponse::from);
+    }
+
+    @Override
+    public List<String> getMyTags(final String apiKey) {
+        final var user = getUserForExport(apiKey);
+        return urlRepository.findDistinctTagsByOwner(user);
     }
 
     @Override

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <changeSet author="khrvacic" id="user-account-two-factor">
+        <addColumn tableName="USER_ACCOUNT">
+            <column name="TWO_FACTOR_ENABLED" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="TWO_FACTOR_SECRET" type="VARCHAR(255)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="USER_ACCOUNT" columnName="TWO_FACTOR_ENABLED"/>
+            <dropColumn tableName="USER_ACCOUNT" columnName="TWO_FACTOR_SECRET"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="two-factor-recovery-code-table" author="khrvacic">
+        <createTable tableName="two_factor_recovery_code">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="USER_ID" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="TWO_FACTOR_RECOVERY_CODE_USER_FK" referencedTableName="USER_ACCOUNT"
+                             referencedColumnNames="ID"/>
+            </column>
+            <column name="CODE_HASH" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="USED" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <rollback>
+            <dropTable tableName="TWO_FACTOR_RECOVERY_CODE"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="khrvacic" id="two_factor_recovery_code-id-seq">
+        <createSequence sequenceName="TWO_FACTOR_RECOVERY_CODE_ID_SEQ" startValue="1" incrementBy="1"/>
+        <rollback>
+            <dropSequence sequenceName="TWO_FACTOR_RECOVERY_CODE_ID_SEQ"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -2,6 +2,7 @@ package cc.hrva.urlshortener.converter;
 
 import cc.hrva.urlshortener.exception.UrlNotFoundException;
 import cc.hrva.urlshortener.repository.UrlRepository;
+import cc.hrva.urlshortener.util.TagNormalizer;
 import lombok.RequiredArgsConstructor;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
 import cc.hrva.urlshortener.model.Url;
@@ -29,6 +30,10 @@ public class UrlUpdateDtoToUrlConverter implements Converter<UrlUpdateDto, Url> 
             existingUrl.setExpirationDate(null);
         } else {
             existingUrl.setExpirationDate(urlUpdateDto.getExpirationDate());
+        }
+
+        if (urlUpdateDto.getTags() != null) {
+            existingUrl.setTags(TagNormalizer.normalize(urlUpdateDto.getTags()));
         }
         return existingUrl;
     }

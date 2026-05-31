@@ -55,6 +55,13 @@ public class User {
 
     private Boolean active;
 
+    private Boolean emailVerified;
+
+    private Boolean twoFactorEnabled;
+
+    @JsonIgnore
+    private String twoFactorSecret;
+
     private String authProvider;
 
     @PrePersist

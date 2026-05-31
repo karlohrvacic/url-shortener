@@ -40,6 +40,10 @@ public class AppProperties {
 
     @NotNull
     @Positive
+    private Long verificationTokenExpirationInHours = 48L;
+
+    @NotNull
+    @Positive
     private Long userApiKeySlots;
 
     @NotBlank

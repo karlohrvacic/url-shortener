@@ -3,9 +3,15 @@ package cc.hrva.urlshortener.service.impl;
 import cc.hrva.urlshortener.converter.UserRegisterDtoToUserConverter;
 import cc.hrva.urlshortener.converter.UserToUserDtoConverter;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
+import cc.hrva.urlshortener.exception.EmailNotVerifiedException;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
+import cc.hrva.urlshortener.repository.UserRepository;
 import cc.hrva.urlshortener.security.ClientIpResolver;
+import cc.hrva.urlshortener.service.SendingEmailService;
+import cc.hrva.urlshortener.service.TwoFactorService;
+import cc.hrva.urlshortener.service.VerificationTokenService;
 import cc.hrva.urlshortener.validator.UserValidator;
+import org.apache.commons.lang3.StringUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,9 +41,13 @@ public class DefaultAuthService implements AuthService {
     private final UserService userService;
     private final UserValidator userValidator;
     private final TokenProvider tokenProvider;
-    private final LoginAttemptService loginAttemptService;
+    private final UserRepository userRepository;
     private final ClientIpResolver clientIpResolver;
+    private final LoginAttemptService loginAttemptService;
+    private final SendingEmailService sendingEmailService;
+    private final TwoFactorService twoFactorService;
     private final UserToUserDtoConverter userToUserDtoConverter;
+    private final VerificationTokenService verificationTokenService;
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final UserRegisterDtoToUserConverter userRegisterDtoToUserConverter;
     private final AppProperties appProperties;
@@ -64,10 +74,52 @@ public class DefaultAuthService implements AuthService {
         final var token = getToken(loginDto);
         final var httpHeaders = getHttpHeaders(token);
         final var user = userService.fetchUserFromEmail(loginDto.getEmail());
+
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new EmailNotVerifiedException("Please verify your email before logging in.");
+        }
+
+        if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
+            if (StringUtils.isBlank(loginDto.getCode())) {
+                return new ResponseEntity<>(JWTTokenDto.twoFactorRequired(), HttpStatus.OK);
+            }
+            if (!twoFactorService.verifyLoginCode(user, loginDto.getCode())) {
+                throw new NoAuthorizationException("Invalid two-factor code");
+            }
+        }
+
         userService.userHasLoggedIn(user);
-        final var jwtTokenDto = new JWTTokenDto(token, userToUserDtoConverter.convert(user));
+        final var jwtTokenDto = JWTTokenDto.builder()
+                .token(token)
+                .user(userToUserDtoConverter.convert(user))
+                .build();
 
         return new ResponseEntity<>(jwtTokenDto, httpHeaders, HttpStatus.OK);
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmail(final String token) {
+        final var verificationToken = verificationTokenService.validateToken(token);
+        final var user = verificationToken.getUser();
+        user.setEmailVerified(true);
+        userService.persistUser(user);
+        verificationTokenService.deactivateAndSaveToken(verificationToken);
+        sendingEmailService.sendWelcomeEmail(user);
+        log.info("Email verified for user id={}", user.getId());
+    }
+
+    @Override
+    @Transactional
+    public void resendVerificationEmail(final String email) {
+        log.info("Verification resend requested email={}", email);
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+                verificationTokenService.deactivateActiveTokensForUser(user);
+                final var token = verificationTokenService.createTokenForUser(user);
+                sendingEmailService.sendVerificationEmail(user, token);
+            }
+        });
     }
 
     private String getToken(final LoginDto loginDto) {

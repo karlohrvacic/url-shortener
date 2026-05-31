@@ -1,5 +1,6 @@
 package cc.hrva.urlshortener.controller;
 
+import cc.hrva.urlshortener.dto.DataExportDto;
 import cc.hrva.urlshortener.dto.DeleteAccountDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
@@ -7,6 +8,7 @@ import cc.hrva.urlshortener.dto.UserSearchDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.service.UserService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -39,6 +41,7 @@ public class UserController {
         return ResponseEntity.ok(userService.fetchCurrentUser());
     }
 
+    @Hidden
     @Operation(summary = "Get all users (admin)", description = "Retrieve paginated list of all users. Supports filtering by search and active. Requires ROLE_ADMIN.")
     @GetMapping
     @PreAuthorize("hasRole('ROLE_ADMIN')")
@@ -48,6 +51,7 @@ public class UserController {
         return ResponseEntity.ok(userService.fetchAllUsers(pageable, search));
     }
 
+    @Hidden
     @Operation(summary = "Delete a user (admin)", description = "Permanently delete a user by ID. Requires ROLE_ADMIN.")
     @ApiResponse(responseCode = "404", description = "User not found")
     @DeleteMapping("/{id}")
@@ -58,6 +62,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @Hidden
     @Operation(summary = "Update a user (admin)", description = "Update user details (email, slots, active status). Requires ROLE_ADMIN.")
     @ApiResponse(responseCode = "400", description = "Validation error or bad request")
     @ApiResponse(responseCode = "404", description = "User not found")
@@ -79,6 +84,13 @@ public class UserController {
         userService.deleteOwnAccount(deleteAccountDto != null ? deleteAccountDto : new DeleteAccountDto());
 
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Export own data", description = "Download all personal data for the authenticated user (profile, URLs, API keys, emails) as JSON.")
+    @GetMapping("/me/export")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_USER')")
+    public ResponseEntity<DataExportDto> exportMyData() {
+        return ResponseEntity.ok(userService.exportMyData());
     }
 
     @Operation(summary = "Update password", description = "Update the password for the authenticated user.")

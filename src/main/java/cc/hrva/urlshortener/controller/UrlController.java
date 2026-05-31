@@ -153,6 +153,15 @@ public class UrlController {
         return ResponseEntity.ok(urlService.getAllMyUrls(apiKey, pageable, search));
     }
 
+    @Operation(summary = "Get my tags", description = "Retrieve the distinct tags used across the authenticated user's URLs.")
+    @GetMapping("/tags")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    public ResponseEntity<java.util.List<String>> getMyTags(
+            @RequestHeader(value = "X-Api-Key", required = false) final String apiKey) {
+        return ResponseEntity.ok(urlService.getMyTags(apiKey));
+    }
+
+    @io.swagger.v3.oas.annotations.Hidden
     @Operation(summary = "Get all URLs (admin)", description = "Retrieve paginated list of all URLs in the system. Supports filtering by search, active, expired, dateFrom, and dateTo. Requires ROLE_ADMIN.")
     @GetMapping("/all")
     @PreAuthorize("hasRole('ROLE_ADMIN')")

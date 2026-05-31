@@ -14,5 +14,11 @@ public class JWTTokenDto {
     private String token;
     @Schema(description = "Authenticated user details")
     private UserDto user;
+    @Schema(description = "True when 2FA is enabled and a TOTP/recovery code is required to complete login", example = "false")
+    private Boolean twoFactorRequired;
+
+    public static JWTTokenDto twoFactorRequired() {
+        return JWTTokenDto.builder().twoFactorRequired(true).build();
+    }
 
 }

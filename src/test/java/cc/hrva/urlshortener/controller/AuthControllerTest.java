@@ -23,6 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,13 +38,16 @@ class AuthControllerTest {
     private UserService userService;
 
     @Mock
+    private cc.hrva.urlshortener.service.TwoFactorService twoFactorService;
+
+    @Mock
     private HttpServletRequest request;
 
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        this.mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService, userService, request)).build();
+        this.mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService, userService, twoFactorService, request)).build();
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
@@ -81,8 +85,58 @@ class AuthControllerTest {
     }
 
     @Test
+    void shouldVerifyEmail() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(VerifyEmailDto.builder().token("tok").build())))
+                .andExpect(status().isNoContent());
+
+        verify(authService).verifyEmail("tok");
+    }
+
+    @Test
+    void shouldResendVerification() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ResendVerificationDto.builder().email("test@example.com").build())))
+                .andExpect(status().isAccepted());
+
+        verify(authService).resendVerificationEmail("test@example.com");
+    }
+
+    @Test
+    void shouldSetupTwoFactor() throws Exception {
+        when(twoFactorService.setup()).thenReturn(new cc.hrva.urlshortener.dto.TwoFactorSetupResponse("SECRET", "otpauth://totp/x"));
+
+        mockMvc.perform(post("/api/v1/auth/2fa/setup"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.secret").value("SECRET"));
+    }
+
+    @Test
+    void shouldEnableTwoFactor() throws Exception {
+        when(twoFactorService.enable("123456")).thenReturn(new cc.hrva.urlshortener.dto.TwoFactorEnableResponse(java.util.List.of("AAAA-BBBB")));
+
+        mockMvc.perform(post("/api/v1/auth/2fa/enable")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TwoFactorCodeDto.builder().code("123456").build())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recoveryCodes[0]").value("AAAA-BBBB"));
+    }
+
+    @Test
+    void shouldDisableTwoFactor() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/2fa/disable")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TwoFactorCodeDto.builder().code("123456").build())))
+                .andExpect(status().isNoContent());
+
+        verify(twoFactorService).disable("123456");
+    }
+
+    @Test
     void shouldLogin() throws Exception {
-        final var jwtDto = new JWTTokenDto("Bearer token", UserDto.builder().id(1L).email("test@example.com").build());
+        final var jwtDto = JWTTokenDto.builder().token("Bearer token").user(UserDto.builder().id(1L).email("test@example.com").build()).build();
         final var headers = new HttpHeaders();
         headers.add("Authorization", "Bearer token");
         when(authService.login(any(LoginDto.class), any())).thenReturn(new ResponseEntity<>(jwtDto, headers, org.springframework.http.HttpStatus.OK));

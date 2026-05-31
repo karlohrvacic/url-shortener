@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,5 +26,7 @@ public class CreateUrlDto {
   private Long visitLimit;
   @Schema(description = "Expiration date and time of the URL", example = "2026-12-31T23:59:59")
   private LocalDateTime expirationDate;
+  @Schema(description = "Tags for organizing the URL (max 10, each ≤30 chars, normalized to lowercase)", example = "[\"work\", \"campaign\"]")
+  private Set<String> tags;
 
 }

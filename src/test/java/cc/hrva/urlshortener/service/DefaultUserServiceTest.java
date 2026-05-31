@@ -71,6 +71,9 @@ class DefaultUserServiceTest {
     private ApiKeyRepository apiKeyRepository;
 
     @Mock
+    private cc.hrva.urlshortener.repository.EmailLogRepository emailLogRepository;
+
+    @Mock
     private IPAddressRepository ipAddressRepository;
 
     @Mock
@@ -80,10 +83,19 @@ class DefaultUserServiceTest {
     private ResetTokenRepository resetTokenRepository;
 
     @Mock
+    private cc.hrva.urlshortener.repository.TwoFactorRecoveryCodeRepository twoFactorRecoveryCodeRepository;
+
+    @Mock
     private UserToUserDtoConverter userToUserDtoConverter;
 
     @Mock
     private DefaultSendingEmailService sendingEmailService;
+
+    @Mock
+    private cc.hrva.urlshortener.service.VerificationTokenService verificationTokenService;
+
+    @Mock
+    private cc.hrva.urlshortener.repository.VerificationTokenRepository verificationTokenRepository;
 
     @Mock
     private UserUpdateDtoToUserConverter userUpdateDtoToUserConverter;
@@ -91,8 +103,9 @@ class DefaultUserServiceTest {
     @BeforeEach
     void setUp() {
         this.userService = new DefaultUserService(appProperties, authValidator, urlRepository, userRepository,
-                passwordEncoder, apiKeyRepository, ipAddressRepository, resetTokenService, resetTokenRepository,
-                userToUserDtoConverter, sendingEmailService, userUpdateDtoToUserConverter);
+                passwordEncoder, apiKeyRepository, emailLogRepository, ipAddressRepository, resetTokenService,
+                resetTokenRepository, twoFactorRecoveryCodeRepository, userToUserDtoConverter, sendingEmailService,
+                verificationTokenService, verificationTokenRepository, userUpdateDtoToUserConverter);
         lenient().when(userRepository.findByEmail(null)).thenReturn(Optional.empty());
     }
 
@@ -104,7 +117,10 @@ class DefaultUserServiceTest {
         final var result = userService.register(user);
 
         assertThat(result.getEmail()).isEqualTo("test@example.com");
-        verify(sendingEmailService).sendWelcomeEmail(user);
+        verify(verificationTokenService).createTokenForUser(user);
+        verify(sendingEmailService).sendVerificationEmail(eq(user), any());
+        verify(sendingEmailService).sendNewUserNotificationToAdmin(user);
+        verify(sendingEmailService, org.mockito.Mockito.never()).sendWelcomeEmail(any());
     }
 
     @Test
@@ -351,6 +367,27 @@ class DefaultUserServiceTest {
 
         assertThat(key.isActive()).isFalse();
         verify(apiKeyRepository).saveAll(Collections.singletonList(key));
+    }
+
+    @Test
+    void shouldExportMyData() {
+        final var user = User.builder().id(1L).email("test@example.com").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("test@example.com", null));
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(urlRepository.findByOwner(user)).thenReturn(Collections.emptyList());
+        when(apiKeyRepository.findByOwner(user)).thenReturn(Collections.emptyList());
+        when(emailLogRepository.findByRecipientContainingIgnoreCase("test@example.com")).thenReturn(Collections.emptyList());
+        when(userToUserDtoConverter.convert(user)).thenReturn(UserDto.builder().id(1L).email("test@example.com").build());
+
+        final var export = userService.exportMyData();
+
+        assertThat(export.profile().getEmail()).isEqualTo("test@example.com");
+        assertThat(export.urls()).isEmpty();
+        assertThat(export.apiKeys()).isEmpty();
+        assertThat(export.emails()).isEmpty();
+        assertThat(export.exportedAt()).isNotNull();
+        SecurityContextHolder.clearContext();
     }
 
     @Test

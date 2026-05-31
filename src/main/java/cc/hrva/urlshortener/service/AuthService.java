@@ -10,5 +10,7 @@ public interface AuthService {
 
     String register(UserRegisterDto userRegisterDto);
     ResponseEntity<JWTTokenDto> login(LoginDto loginDto, HttpServletRequest request);
+    void verifyEmail(String token);
+    void resendVerificationEmail(String email);
 
 }

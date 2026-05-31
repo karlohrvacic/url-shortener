@@ -22,4 +22,7 @@ public class LoginDto {
     @Schema(description = "Whether to remember the user across sessions", example = "false")
     private Boolean rememberMe;
 
+    @Schema(description = "TOTP or recovery code, required only when the account has 2FA enabled", example = "123456")
+    private String code;
+
 }

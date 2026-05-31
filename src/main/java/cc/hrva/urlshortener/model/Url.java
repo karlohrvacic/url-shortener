@@ -11,6 +11,7 @@ import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -50,6 +51,11 @@ public class Url {
 
     @Enumerated(EnumType.STRING)
     private ThreatType threatType;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "url_tags", joinColumns = @JoinColumn(name = "URL_ID"))
+    @Column(name = "TAG")
+    private Set<String> tags;
 
     private boolean active;
 

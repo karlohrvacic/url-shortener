@@ -1,7 +1,7 @@
 # URL-Shortener Agent Guide
 
 ## Build & Run
-- **Java 25**, **Spring Boot 4.0.6**, **Maven**. No Gradle artifacts.
+- **Java 25**, **Spring Boot 4.0.6**, **Maven**. No Gverifyradle artifacts.
 - `.mvn/wrapper/` exists but `mvnw` is missing — use system `mvn`.
 - Entry point: `cc.hrva.urlshortener.UrlShortenerApplication`
 - Local dev:
@@ -80,6 +80,17 @@ cc.hrva.urlshortener
 | POST | `/api/v1/auth/login` | None | Login (returns JWT) |
 | POST | `/api/v1/auth/password-reset` | None | Request reset |
 | POST | `/api/v1/auth/password-reset/confirm` | None | Confirm reset |
+| POST | `/api/v1/auth/verify-email/confirm` | None | Confirm email with token |
+| POST | `/api/v1/auth/verify-email/resend` | None | Resend verification email (always 202) |
+| POST | `/api/v1/auth/2fa/setup` | Required | Start TOTP enrollment (local accounts) |
+| POST | `/api/v1/auth/2fa/enable` | Required | Confirm code, enable 2FA, get recovery codes |
+| POST | `/api/v1/auth/2fa/disable` | Required | Disable 2FA (TOTP or recovery code) |
+| GET | `/api/v1/users/me` | Required | Current user |
+| GET | `/api/v1/users/me/export` | Required | GDPR data export (JSON) |
+| DELETE | `/api/v1/users/me` | Required | Self-delete (password-confirmed for local) |
+| GET | `/api/v1/urls/tags` | ROLE_USER | Distinct tags for current user |
+| GET | `/api/v1/analytics/overview` | Required | Aggregate URL analytics for current user |
+| GET | `/api/v1/analytics/urls/{id}` | Required | Per-URL analytics (owner/admin) |
 | GET | `/api/v1/admin/stats` | ROLE_ADMIN | Dashboard stats (users, URLs, cache, etc.) |
 | GET | `/api/v1/admin/audit-log` | ROLE_ADMIN | Paginated admin audit trail |
 | GET | `/api/v1/admin/email-log` | ROLE_ADMIN | Paginated email delivery log |
@@ -114,6 +125,9 @@ cc.hrva.urlshortener
 - Client IP resolved via `ClientIpResolver` + `ForwardedHeaderFilter` (never read X-Forwarded-For manually).
 - Logging: SLF4J via `@Slf4j`, parameterized `{}` format.
 - Actuator endpoints: `/actuator/health` public, all others ROLE_ADMIN only.
+- **Login gating** (in order): password auth → `emailVerified` check (`EmailNotVerifiedException` → 403) → if `twoFactorEnabled`, require `code` in `LoginDto` (missing → `{twoFactorRequired:true}`, no token; invalid → 401). `active` enforced at `UserDetails.enabled` (password) + `OAuth2LoginSuccessHandler` + per-request in `JwtFilter`.
+- **2FA**: TOTP (RFC 6238) via `Totp` (hand-rolled, no dep). Local accounts only. Secret on `user_account`, recovery codes bcrypt-hashed in `two_factor_recovery_code`.
+- **API docs**: admin endpoints hidden from OpenAPI/Swagger via `@Hidden` (whole `AdminController` + admin methods in shared controllers).
 
 ## Scheduled Tasks
 - **URL expiry**: Daily at 8 AM, sends email notification for URLs expiring within 24 hours (configurable via `app.url-expiration-notification-hours`).
@@ -141,6 +155,20 @@ cc.hrva.urlshortener
 - Records email sending: recipient, subject, status (SENDING/SENT/FAILED), errorMessage, sentAt, createdAt
 - Populated automatically by `tryToSendEmail` in `DefaultSendingEmailService`
 - Endpoint: `GET /api/v1/admin/email-log`
+
+### VerificationToken (`verification_token` table, migration `013-email-verification.xml`)
+- Email verification on register; `user_account.email_verified` (existing users grandfathered `true`). OAuth users auto-verified.
+- Flow: register → unverified + verification email; `POST /auth/verify-email/confirm` activates; `/resend` reissues.
+
+### URL tags (`url_tags` table, migration `014-url-tags.xml`)
+- `Url.tags` `@ElementCollection` of normalized strings (`TagNormalizer`: lowercase, ≤10 × ≤30 chars). Filter via `?tag=`; list via `GET /urls/tags`.
+
+### TwoFactorRecoveryCode (`two_factor_recovery_code` table, migration `015-two-factor.xml`)
+- 2FA recovery codes (bcrypt-hashed, one-time). `user_account.two_factor_enabled` / `two_factor_secret`.
+
+### Account self-service
+- `GET /users/me/export` (GDPR JSON: profile + urls + api keys + emails); `DELETE /users/me` (hard delete; clears reset/verification/recovery tokens, ip_address rows, urls, api keys).
+- URL/API-key responses carry a `status` reason (ACTIVE / EXPIRED / LIMIT_REACHED / REVOKED / DEACTIVATED / BLOCKED).
 
 ## Cache Architecture
 - **Cache name**: `urls`

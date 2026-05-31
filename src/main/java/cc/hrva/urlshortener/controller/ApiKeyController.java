@@ -43,6 +43,7 @@ public class ApiKeyController {
         return ResponseEntity.ok(apiKeyService.fetchMyApiKeys());
     }
 
+    @io.swagger.v3.oas.annotations.Hidden
     @Operation(summary = "Get all API keys (admin)", description = "Retrieve paginated list of all API keys in the system. Requires ROLE_ADMIN.")
     @GetMapping("/all")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
@@ -51,6 +52,7 @@ public class ApiKeyController {
         return ResponseEntity.ok(apiKeyService.fetchAllApiKeys(pageable));
     }
 
+    @io.swagger.v3.oas.annotations.Hidden
     @Operation(summary = "Update an API key", description = "Update API key settings. Requires ROLE_ADMIN.")
     @ApiResponse(responseCode = "400", description = "Validation error or bad request")
     @ApiResponse(responseCode = "404", description = "API key not found")

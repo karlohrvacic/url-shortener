@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 public interface ApiKeyRepository extends JpaRepository<ApiKey, Long> {
 
     Optional<ApiKey> findApiKeyByKey(String key);
+    List<ApiKey> findByOwner(User owner);
     List<ApiKey> findByOwnerAndActiveTrue(User owner);
     List<ApiKey> findByExpirationDateIsLessThanEqualAndActiveTrue(LocalDateTime createDate);
 

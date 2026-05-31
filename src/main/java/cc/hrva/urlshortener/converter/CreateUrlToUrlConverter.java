@@ -2,6 +2,7 @@ package cc.hrva.urlshortener.converter;
 
 import cc.hrva.urlshortener.dto.CreateUrlDto;
 import cc.hrva.urlshortener.model.Url;
+import cc.hrva.urlshortener.util.TagNormalizer;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ public class CreateUrlToUrlConverter implements Converter<CreateUrlDto, Url> {
         .shortUrl(createUrlDto.getShortUrl())
         .visitLimit(createUrlDto.getVisitLimit())
         .expirationDate(createUrlDto.getExpirationDate())
+        .tags(TagNormalizer.normalize(createUrlDto.getTags()))
         .build();
   }
 

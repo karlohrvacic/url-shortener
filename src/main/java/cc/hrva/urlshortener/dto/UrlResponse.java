@@ -3,6 +3,7 @@ package cc.hrva.urlshortener.dto;
 import cc.hrva.urlshortener.model.Url;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 public record UrlResponse(
         @Schema(description = "Unique identifier", example = "1")
@@ -23,6 +24,8 @@ public record UrlResponse(
         boolean active,
         @Schema(description = "Reason for the current state: ACTIVE, LIMIT_REACHED, EXPIRED, BLOCKED, DEACTIVATED", example = "ACTIVE")
         String status,
+        @Schema(description = "Tags assigned to the URL", example = "[\"work\"]")
+        Set<String> tags,
         @Schema(description = "Email of the URL owner", example = "user@example.com")
         String ownerEmail) {
 
@@ -37,6 +40,7 @@ public record UrlResponse(
                 url.getVisitLimit(),
                 url.isActive(),
                 resolveStatus(url),
+                url.getTags() != null ? url.getTags() : java.util.Set.of(),
                 url.getOwner() != null ? url.getOwner().getEmail() : null);
     }
 

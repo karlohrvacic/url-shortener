@@ -53,6 +53,18 @@ class DefaultAuthServiceTest {
     private LoginAttemptService loginAttemptService;
 
     @Mock
+    private cc.hrva.urlshortener.repository.UserRepository userRepository;
+
+    @Mock
+    private cc.hrva.urlshortener.service.SendingEmailService sendingEmailService;
+
+    @Mock
+    private cc.hrva.urlshortener.service.VerificationTokenService verificationTokenService;
+
+    @Mock
+    private cc.hrva.urlshortener.service.TwoFactorService twoFactorService;
+
+    @Mock
     private UserToUserDtoConverter userToUserDtoConverter;
 
     @Mock
@@ -78,7 +90,9 @@ class DefaultAuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        this.authService = new DefaultAuthService(userService, userValidator, tokenProvider, loginAttemptService, clientIpResolver, userToUserDtoConverter, authenticationManagerBuilder, userRegisterDtoToUserConverter, appProperties);
+        this.authService = new DefaultAuthService(userService, userValidator, tokenProvider, userRepository,
+                clientIpResolver, loginAttemptService, sendingEmailService, twoFactorService, userToUserDtoConverter,
+                verificationTokenService, authenticationManagerBuilder, userRegisterDtoToUserConverter, appProperties);
     }
 
     @Test
@@ -99,7 +113,7 @@ class DefaultAuthServiceTest {
     @Test
     void shouldLoginSuccessfully() {
         final var loginDto = LoginDto.builder().email("test@example.com").password("password123").build();
-        final var user = User.builder().id(1L).email("test@example.com").build();
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(true).build();
         final var userDto = UserDto.builder().id(1L).email("test@example.com").build();
 
         when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
@@ -131,6 +145,132 @@ class DefaultAuthServiceTest {
         assertThatThrownBy(() -> authService.login(loginDto, request))
                 .isInstanceOf(NoAuthorizationException.class)
                 .hasMessage("Request has been blocked");
+    }
+
+    @Test
+    void shouldBlockLoginWhenEmailNotVerified() {
+        final var loginDto = LoginDto.builder().email("test@example.com").password("password123").build();
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(false).build();
+
+        when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
+        when(loginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
+        when(authenticationManagerBuilder.getObject()).thenReturn(authenticationManager);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
+        when(appProperties.getJwtTokenValiditySeconds()).thenReturn(36000L);
+        when(tokenProvider.createToken(authentication, 36000L)).thenReturn("jwtToken");
+        when(userService.fetchUserFromEmail("test@example.com")).thenReturn(user);
+
+        assertThatThrownBy(() -> authService.login(loginDto, request))
+                .isInstanceOf(cc.hrva.urlshortener.exception.EmailNotVerifiedException.class);
+        verify(userService, org.mockito.Mockito.never()).userHasLoggedIn(any());
+    }
+
+    @Test
+    void shouldReturnTwoFactorRequiredWhenCodeMissing() {
+        final var loginDto = LoginDto.builder().email("test@example.com").password("password123").build();
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(true).twoFactorEnabled(true).build();
+
+        when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
+        when(loginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
+        when(authenticationManagerBuilder.getObject()).thenReturn(authenticationManager);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
+        when(appProperties.getJwtTokenValiditySeconds()).thenReturn(36000L);
+        when(tokenProvider.createToken(authentication, 36000L)).thenReturn("jwtToken");
+        when(userService.fetchUserFromEmail("test@example.com")).thenReturn(user);
+
+        final var response = authService.login(loginDto, request);
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getTwoFactorRequired()).isTrue();
+        assertThat(response.getBody().getToken()).isNull();
+        verify(userService, org.mockito.Mockito.never()).userHasLoggedIn(any());
+    }
+
+    @Test
+    void shouldLoginWhenTwoFactorCodeValid() {
+        final var loginDto = LoginDto.builder().email("test@example.com").password("password123").code("123456").build();
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(true).twoFactorEnabled(true).build();
+
+        when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
+        when(loginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
+        when(authenticationManagerBuilder.getObject()).thenReturn(authenticationManager);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
+        when(appProperties.getJwtTokenValiditySeconds()).thenReturn(36000L);
+        when(tokenProvider.createToken(authentication, 36000L)).thenReturn("jwtToken");
+        when(userService.fetchUserFromEmail("test@example.com")).thenReturn(user);
+        when(twoFactorService.verifyLoginCode(user, "123456")).thenReturn(true);
+        when(userToUserDtoConverter.convert(user)).thenReturn(UserDto.builder().id(1L).build());
+
+        final var response = authService.login(loginDto, request);
+
+        assertThat(response.getBody().getToken()).isEqualTo("Bearer jwtToken");
+        verify(userService).userHasLoggedIn(user);
+    }
+
+    @Test
+    void shouldFailLoginWhenTwoFactorCodeInvalid() {
+        final var loginDto = LoginDto.builder().email("test@example.com").password("password123").code("000000").build();
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(true).twoFactorEnabled(true).build();
+
+        when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
+        when(loginAttemptService.isBlocked("127.0.0.1")).thenReturn(false);
+        when(authenticationManagerBuilder.getObject()).thenReturn(authenticationManager);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
+        when(appProperties.getJwtTokenValiditySeconds()).thenReturn(36000L);
+        when(tokenProvider.createToken(authentication, 36000L)).thenReturn("jwtToken");
+        when(userService.fetchUserFromEmail("test@example.com")).thenReturn(user);
+        when(twoFactorService.verifyLoginCode(user, "000000")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(loginDto, request))
+                .isInstanceOf(NoAuthorizationException.class);
+    }
+
+    @Test
+    void shouldVerifyEmail() {
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(false).build();
+        final var token = cc.hrva.urlshortener.model.VerificationToken.builder().id(1L).user(user).active(true).build();
+
+        when(verificationTokenService.validateToken("tok")).thenReturn(token);
+
+        authService.verifyEmail("tok");
+
+        assertThat(user.getEmailVerified()).isTrue();
+        verify(userService).persistUser(user);
+        verify(verificationTokenService).deactivateAndSaveToken(token);
+        verify(sendingEmailService).sendWelcomeEmail(user);
+    }
+
+    @Test
+    void shouldResendVerificationForUnverifiedUser() {
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(false).build();
+        final var token = cc.hrva.urlshortener.model.VerificationToken.builder().id(1L).user(user).build();
+
+        when(userRepository.findByEmail("test@example.com")).thenReturn(java.util.Optional.of(user));
+        when(verificationTokenService.createTokenForUser(user)).thenReturn(token);
+
+        authService.resendVerificationEmail("test@example.com");
+
+        verify(verificationTokenService).deactivateActiveTokensForUser(user);
+        verify(sendingEmailService).sendVerificationEmail(user, token);
+    }
+
+    @Test
+    void shouldNotResendForAlreadyVerifiedUser() {
+        final var user = User.builder().id(1L).email("test@example.com").emailVerified(true).build();
+        when(userRepository.findByEmail("test@example.com")).thenReturn(java.util.Optional.of(user));
+
+        authService.resendVerificationEmail("test@example.com");
+
+        verify(verificationTokenService, org.mockito.Mockito.never()).createTokenForUser(any());
+    }
+
+    @Test
+    void shouldNotResendForUnknownEmail() {
+        when(userRepository.findByEmail("missing@example.com")).thenReturn(java.util.Optional.empty());
+
+        authService.resendVerificationEmail("missing@example.com");
+
+        verify(verificationTokenService, org.mockito.Mockito.never()).createTokenForUser(any());
     }
 
 }

@@ -18,6 +18,7 @@ public class UserToUserDtoConverter implements Converter<User, UserDto> {
                 .createDate(user.getCreateDate())
                 .lastLogin(user.getLastLogin())
                 .authProvider(user.getAuthProvider())
+                .twoFactorEnabled(user.getTwoFactorEnabled())
                 .build();
     }
 

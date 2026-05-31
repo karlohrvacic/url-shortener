@@ -93,6 +93,21 @@ class UserControllerTest {
     }
 
     @Test
+    void shouldExportMyData() throws Exception {
+        final var export = new cc.hrva.urlshortener.dto.DataExportDto(
+                java.time.LocalDateTime.now(),
+                UserDto.builder().id(1L).email("test@example.com").build(),
+                java.util.Collections.emptyList(),
+                java.util.Collections.emptyList(),
+                java.util.Collections.emptyList());
+        when(userService.exportMyData()).thenReturn(export);
+
+        mockMvc.perform(get("/api/v1/users/me/export"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile.email").value("test@example.com"));
+    }
+
+    @Test
     void shouldDeleteOwnAccount() throws Exception {
         mockMvc.perform(delete("/api/v1/users/me")
                         .contentType(MediaType.APPLICATION_JSON)

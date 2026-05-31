@@ -281,4 +281,15 @@ class UrlServiceTest {
         assertThat(result.active()).isTrue();
     }
 
+    @Test
+    void shouldReturnMyDistinctTags() {
+        final var user = User.builder().id(1L).email("u@example.com").build();
+        when(userService.getUserFromToken()).thenReturn(user);
+        when(urlRepository.findDistinctTagsByOwner(user)).thenReturn(java.util.List.of("work", "campaign"));
+
+        final var tags = urlService.getMyTags(null);
+
+        assertThat(tags).containsExactly("work", "campaign");
+    }
+
 }

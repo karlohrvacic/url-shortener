@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <changeSet id="verification-token-table" author="khrvacic">
+        <createTable tableName="verification_token">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="USER_ID" type="BIGINT">
+                <constraints nullable="false" foreignKeyName="VERIFICATION_TOKEN_USER_FK" referencedTableName="USER_ACCOUNT"
+                             referencedColumnNames="ID"/>
+            </column>
+            <column name="TOKEN" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="CREATE_DATE" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="EXPIRATION_DATE" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ACTIVE" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <rollback>
+            <dropTable tableName="VERIFICATION_TOKEN"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="khrvacic" id="verification_token-id-seq">
+        <createSequence sequenceName="VERIFICATION_TOKEN_ID_SEQ" startValue="1" incrementBy="1"/>
+        <rollback>
+            <dropSequence sequenceName="VERIFICATION_TOKEN_ID_SEQ"/>
+        </rollback>
+    </changeSet>
+
+    <!--
+      Existing users predate email verification: grandfather them as verified so enforcement
+      does not lock anyone out. New rows get their value from the entity (false on register,
+      true for OAuth).
+    -->
+    <changeSet author="khrvacic" id="user-account-email-verified">
+        <addColumn tableName="USER_ACCOUNT">
+            <column name="EMAIL_VERIFIED" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="USER_ACCOUNT" columnName="EMAIL_VERIFIED"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
