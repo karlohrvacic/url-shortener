@@ -58,4 +58,10 @@ class UrlResponseTest {
     void shouldDefaultTagsToEmptyWhenNull() {
         assertThat(UrlResponse.from(baseUrl().active(true).build()).tags()).isEmpty();
     }
+
+    @Test
+    void shouldFlagPasswordProtected() {
+        assertThat(UrlResponse.from(baseUrl().active(true).passwordHash("hash").build()).passwordProtected()).isTrue();
+        assertThat(UrlResponse.from(baseUrl().active(true).build()).passwordProtected()).isFalse();
+    }
 }

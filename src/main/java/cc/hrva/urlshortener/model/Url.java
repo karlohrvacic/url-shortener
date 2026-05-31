@@ -1,5 +1,6 @@
 package cc.hrva.urlshortener.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import cc.hrva.urlshortener.model.enums.PlatformType;
 import cc.hrva.urlshortener.model.enums.ThreatEntryType;
 import cc.hrva.urlshortener.model.enums.ThreatType;
@@ -56,6 +57,9 @@ public class Url {
     @CollectionTable(name = "url_tags", joinColumns = @JoinColumn(name = "URL_ID"))
     @Column(name = "TAG")
     private Set<String> tags;
+
+    @JsonIgnore
+    private String passwordHash;
 
     private boolean active;
 

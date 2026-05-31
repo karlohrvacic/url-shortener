@@ -22,9 +22,11 @@
           "title": "URLs & Analytics",
           "icon": "link",
           "items": [
+            "Password-protected links — lock a short URL behind a password (registered users); visitors enter it before the redirect resolves.",
             "URL tags — organize links with tags, filter by tag, see them on the dashboard.",
             "Per-URL and overview click analytics (visits, unique recent visitors, new-visitor trend).",
-            "URL and API-key status now shows the real reason: Active, Expired, Limit reached, Revoked, Deactivated, or Blocked."
+            "URL and API-key status now shows the real reason: Active, Expired, Limit reached, Revoked, Deactivated, or Blocked.",
+            "Customizable QR codes — pick colors, size, and error-correction level, with PNG and SVG download."
           ]
         },
         {

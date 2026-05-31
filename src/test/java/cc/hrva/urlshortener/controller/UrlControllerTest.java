@@ -146,6 +146,19 @@ class UrlControllerTest {
     }
 
     @Test
+    void shouldUnlockUrl() throws Exception {
+        when(clientIpResolver.getClientIp(request)).thenReturn("127.0.0.1");
+        when(urlService.unlockUrl(eq("abc"), eq("pw"), eq("127.0.0.1")))
+                .thenReturn(new cc.hrva.urlshortener.dto.UnlockResponse("https://example.com"));
+
+        mockMvc.perform(post("/api/v1/urls/abc/unlock")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"pw\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.longUrl").value("https://example.com"));
+    }
+
+    @Test
     void shouldGetMyTags() throws Exception {
         when(urlService.getMyTags(null)).thenReturn(java.util.List.of("work", "campaign"));
 

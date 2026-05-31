@@ -70,6 +70,12 @@ public class User {
         if (this.active == null) {
             this.active = true;
         }
+        if (this.emailVerified == null) {
+            this.emailVerified = false;
+        }
+        if (this.twoFactorEnabled == null) {
+            this.twoFactorEnabled = false;
+        }
     }
 
     public void userLoggedIn() {

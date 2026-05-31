@@ -8,6 +8,8 @@ import cc.hrva.urlshortener.dto.CreateUrlDto;
 import cc.hrva.urlshortener.dto.UrlResponse;
 import cc.hrva.urlshortener.dto.UrlSearchDto;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
+import cc.hrva.urlshortener.dto.UnlockResponse;
+import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.exception.UrlNotFoundException;
 import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.PeekUrl;
@@ -73,6 +75,7 @@ public class DefaultUrlService implements UrlService {
     private final CacheManager cacheManager;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -85,9 +88,30 @@ public class DefaultUrlService implements UrlService {
         validateUrl(url);
 
         if (currentUser != null) {
+            applyPassword(url, createUrlDto.getPassword());
             return saveUrlForUser(url, currentUser);
         }
         return UrlResponse.from(createUrlForAnonymousUser(url));
+    }
+
+    private void applyPassword(final Url url, final String rawPassword) {
+        if (StringUtils.isNotBlank(rawPassword)) {
+            url.setPasswordHash(passwordEncoder.encode(rawPassword));
+        }
+    }
+
+    @Override
+    @Transactional
+    public UnlockResponse unlockUrl(final String shortUrl, final String password, final String clientIP) {
+        final var url = urlRepository.findByShortUrlAndActiveTrue(shortUrl)
+                .orElseThrow(() -> new UrlNotFoundException("URL doesn't exist"));
+
+        if (url.getPasswordHash() != null && !passwordEncoder.matches(password, url.getPasswordHash())) {
+            throw new NoAuthorizationException("Incorrect password");
+        }
+
+        asyncCheckIfVisitUnique(clientIP, url);
+        return new UnlockResponse(url.getLongUrl());
     }
 
     @Override
@@ -103,6 +127,7 @@ public class DefaultUrlService implements UrlService {
         apiKeyValidator.apiKeyExistsByKeyAndIsValid(key);
         apiKeyService.apiKeyUseAction(apiKey);
 
+        applyPassword(url, createUrlDto.getPassword());
         return saveUrlForUser(url, apiKey.getOwner());
     }
 
@@ -367,6 +392,11 @@ public class DefaultUrlService implements UrlService {
                 .orElse(null);
         if (cachedValue != null) {
             if (isUrlRedirectValid(cachedValue)) {
+                if (cachedValue.passwordProtected()) {
+                    final var gate = new RedirectView();
+                    gate.setUrl(protectedPageUrl(shortUrl));
+                    return gate;
+                }
                 final var redirectView = new RedirectView();
                 redirectView.setUrl(cachedValue.longUrl());
                 fireVisitTracking(shortUrl, clientIP);
@@ -389,10 +419,17 @@ public class DefaultUrlService implements UrlService {
             if (cache != null) {
                 cache.put(shortUrl, response);
             }
+            if (response.passwordProtected()) {
+                return protectedPageUrl(shortUrl);
+            }
             asyncCheckIfVisitUnique(clientIP, url);
             return response.longUrl();
         }
         return appProperties.getFrontendUrl();
+    }
+
+    private String protectedPageUrl(final String shortUrl) {
+        return appProperties.getFrontendUrl() + "/protected/" + shortUrl;
     }
 
     private Object getFromCache(final String shortUrl) {

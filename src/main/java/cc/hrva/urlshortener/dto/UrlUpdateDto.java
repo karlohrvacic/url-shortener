@@ -22,5 +22,7 @@ public class UrlUpdateDto {
     private LocalDateTime expirationDate;
     @Schema(description = "Tags (replaces existing when provided; null leaves them unchanged)", example = "[\"work\"]")
     private Set<String> tags;
+    @Schema(description = "Password: non-empty sets/replaces it, empty string clears it, null leaves it unchanged", example = "s3cret")
+    private String password;
 
 }

@@ -24,9 +24,12 @@ class UrlUpdateDtoToUrlConverterTest {
     @Mock
     private UrlRepository urlRepository;
 
+    @Mock
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @BeforeEach
     void setUp() {
-        this.converter = new UrlUpdateDtoToUrlConverter(this.urlRepository);
+        this.converter = new UrlUpdateDtoToUrlConverter(this.urlRepository, this.passwordEncoder);
     }
 
     @Test
@@ -103,6 +106,40 @@ class UrlUpdateDtoToUrlConverterTest {
         final var result = converter.convert(updateDto);
 
         assertThat(result.getTags()).containsExactly("keep");
+    }
+
+    @Test
+    void shouldSetPasswordWhenProvided() {
+        final var existingUrl = Url.builder().id(1L).longUrl("https://example.com").build();
+        final var updateDto = UrlUpdateDto.builder().id(1L).password("secret").build();
+        when(urlRepository.findById(anyLong())).thenReturn(Optional.of(existingUrl));
+        when(passwordEncoder.encode("secret")).thenReturn("hashed");
+
+        final var result = converter.convert(updateDto);
+
+        assertThat(result.getPasswordHash()).isEqualTo("hashed");
+    }
+
+    @Test
+    void shouldClearPasswordWhenEmpty() {
+        final var existingUrl = Url.builder().id(1L).longUrl("https://example.com").passwordHash("old").build();
+        final var updateDto = UrlUpdateDto.builder().id(1L).password("").build();
+        when(urlRepository.findById(anyLong())).thenReturn(Optional.of(existingUrl));
+
+        final var result = converter.convert(updateDto);
+
+        assertThat(result.getPasswordHash()).isNull();
+    }
+
+    @Test
+    void shouldLeavePasswordWhenNull() {
+        final var existingUrl = Url.builder().id(1L).longUrl("https://example.com").passwordHash("keep").build();
+        final var updateDto = UrlUpdateDto.builder().id(1L).build();
+        when(urlRepository.findById(anyLong())).thenReturn(Optional.of(existingUrl));
+
+        final var result = converter.convert(updateDto);
+
+        assertThat(result.getPasswordHash()).isEqualTo("keep");
     }
 
     @Test

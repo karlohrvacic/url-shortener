@@ -10,8 +10,10 @@ All notable changes to hrva.cc — the URL shortener.
 - **Email verification** — new registrations must confirm their email before login; resend supported. Existing users grandfathered as verified; Google accounts auto-verified.
 - **Two-factor authentication (TOTP)** — enroll an authenticator app (QR), confirm a code, receive one-time recovery codes. Login gains a second step. Local accounts only.
 - **Account self-service** — delete your account (password-confirmed) along with all your URLs and API keys; download all your data as JSON (GDPR).
+- **Password-protected links** — lock a short URL behind a password (registered users); visitors enter it before redirect.
 - **URL tags** — tag links, filter by tag, manage tags on create/edit.
 - **Click analytics** — per-URL and overview analytics (visits, unique recent visitors, 30-day new-visitor trend).
+- **Customizable QR codes** — choose colors, size, and error-correction level; download as PNG or SVG.
 - **Admin signup email + stats** — admin notified on new registrations; dashboard shows new-user counts (7d / 30d).
 
 ### 🔒 Security

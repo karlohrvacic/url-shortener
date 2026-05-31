@@ -28,5 +28,7 @@ public class CreateUrlDto {
   private LocalDateTime expirationDate;
   @Schema(description = "Tags for organizing the URL (max 10, each ≤30 chars, normalized to lowercase)", example = "[\"work\", \"campaign\"]")
   private Set<String> tags;
+  @Schema(description = "Optional password to protect the link (registered users only; ignored for anonymous)", example = "s3cret")
+  private String password;
 
 }

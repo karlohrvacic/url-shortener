@@ -32,6 +32,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.task.TaskExecutor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -84,6 +85,9 @@ class UrlServiceTest {
     @Mock
     private MeterRegistry meterRegistry;
 
+    @Mock
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @BeforeEach
     void setUp() {
         this.urlService = new DefaultUrlService(
@@ -100,7 +104,8 @@ class UrlServiceTest {
                 urlUpdateDtoToUrlConverter,
                 cacheManager,
                 objectMapper,
-                meterRegistry
+                meterRegistry,
+                passwordEncoder
         );
     }
 
@@ -279,6 +284,37 @@ class UrlServiceTest {
 
         final var result = urlService.activateUrl(1L);
         assertThat(result.active()).isTrue();
+    }
+
+    @Test
+    void shouldUnlockWithCorrectPassword() {
+        final var url = Url.builder().id(1L).shortUrl("a").longUrl("https://a.com").active(true).passwordHash("hash").build();
+        when(urlRepository.findByShortUrlAndActiveTrue("a")).thenReturn(Optional.of(url));
+        when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
+
+        final var result = urlService.unlockUrl("a", "pw", "127.0.0.1");
+
+        assertThat(result.longUrl()).isEqualTo("https://a.com");
+    }
+
+    @Test
+    void shouldRejectUnlockWithWrongPassword() {
+        final var url = Url.builder().id(1L).shortUrl("a").longUrl("https://a.com").active(true).passwordHash("hash").build();
+        when(urlRepository.findByShortUrlAndActiveTrue("a")).thenReturn(Optional.of(url));
+        when(passwordEncoder.matches("nope", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> urlService.unlockUrl("a", "nope", "127.0.0.1"))
+                .isInstanceOf(cc.hrva.urlshortener.exception.NoAuthorizationException.class);
+    }
+
+    @Test
+    void shouldUnlockNonProtectedUrlWithoutPasswordCheck() {
+        final var url = Url.builder().id(1L).shortUrl("a").longUrl("https://a.com").active(true).build();
+        when(urlRepository.findByShortUrlAndActiveTrue("a")).thenReturn(Optional.of(url));
+
+        final var result = urlService.unlockUrl("a", null, "127.0.0.1");
+
+        assertThat(result.longUrl()).isEqualTo("https://a.com");
     }
 
     @Test

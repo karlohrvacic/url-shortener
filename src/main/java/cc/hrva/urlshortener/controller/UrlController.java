@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import cc.hrva.urlshortener.dto.CreateUrlDto;
 import cc.hrva.urlshortener.dto.LinkPreviewResponse;
+import cc.hrva.urlshortener.dto.UnlockResponse;
+import cc.hrva.urlshortener.dto.UnlockUrlDto;
 import cc.hrva.urlshortener.dto.UrlResponse;
 import cc.hrva.urlshortener.dto.UrlSearchDto;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
@@ -76,6 +78,17 @@ public class UrlController {
     @GetMapping("/{short}/peek")
     public ResponseEntity<PeekUrl> peekUrlByShortUrl(@PathVariable("short") final String shortUrl) {
         return ResponseEntity.ok(urlService.peekUrlByShortUrl(shortUrl));
+    }
+
+    @Operation(summary = "Unlock a password-protected URL", description = "Submit the password for a protected short URL to receive its destination and record the visit.")
+    @ApiResponse(responseCode = "403", description = "Incorrect password")
+    @ApiResponse(responseCode = "404", description = "URL not found")
+    @PostMapping("/{short}/unlock")
+    public ResponseEntity<UnlockResponse> unlockUrl(
+            @PathVariable("short") final String shortUrl,
+            @Valid @RequestBody final UnlockUrlDto dto) {
+        final var clientIp = clientIpResolver.getClientIp(request);
+        return ResponseEntity.ok(urlService.unlockUrl(shortUrl, dto.getPassword(), clientIp));
     }
 
     @Operation(summary = "Get rich link preview", description = "Fetch Open Graph metadata (title, description, image) for a short URL.")

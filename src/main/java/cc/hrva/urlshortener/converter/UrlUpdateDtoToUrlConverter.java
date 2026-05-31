@@ -6,7 +6,9 @@ import cc.hrva.urlshortener.util.TagNormalizer;
 import lombok.RequiredArgsConstructor;
 import cc.hrva.urlshortener.dto.UrlUpdateDto;
 import cc.hrva.urlshortener.model.Url;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Component;
 public class UrlUpdateDtoToUrlConverter implements Converter<UrlUpdateDto, Url> {
 
     private final UrlRepository urlRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public Url convert(final UrlUpdateDto urlUpdateDto) {
@@ -34,6 +37,12 @@ public class UrlUpdateDtoToUrlConverter implements Converter<UrlUpdateDto, Url> 
 
         if (urlUpdateDto.getTags() != null) {
             existingUrl.setTags(TagNormalizer.normalize(urlUpdateDto.getTags()));
+        }
+
+        if (urlUpdateDto.getPassword() != null) {
+            existingUrl.setPasswordHash(StringUtils.isBlank(urlUpdateDto.getPassword())
+                    ? null
+                    : passwordEncoder.encode(urlUpdateDto.getPassword()));
         }
         return existingUrl;
     }

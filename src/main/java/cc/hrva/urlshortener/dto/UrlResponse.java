@@ -26,6 +26,8 @@ public record UrlResponse(
         String status,
         @Schema(description = "Tags assigned to the URL", example = "[\"work\"]")
         Set<String> tags,
+        @Schema(description = "Whether the URL requires a password to resolve", example = "false")
+        boolean passwordProtected,
         @Schema(description = "Email of the URL owner", example = "user@example.com")
         String ownerEmail) {
 
@@ -41,6 +43,7 @@ public record UrlResponse(
                 url.isActive(),
                 resolveStatus(url),
                 url.getTags() != null ? url.getTags() : java.util.Set.of(),
+                url.getPasswordHash() != null,
                 url.getOwner() != null ? url.getOwner().getEmail() : null);
     }
 
