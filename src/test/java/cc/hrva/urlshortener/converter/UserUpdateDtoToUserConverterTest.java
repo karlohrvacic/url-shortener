@@ -40,6 +40,35 @@ class UserUpdateDtoToUserConverterTest {
     }
 
     @Test
+    void shouldApplyNonNullFields() {
+        final UserUpdateDto userUpdateDto = UserUpdateDto.builder()
+                .id(1L).email("new@example.com").apiKeySlots(9L).active(false).build();
+        final User user = User.builder().id(1L).email("old@example.com").apiKeySlots(3L).active(true).build();
+
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(user));
+
+        final var result = converter.convert(userUpdateDto);
+
+        assertThat(result.getEmail()).isEqualTo("new@example.com");
+        assertThat(result.getApiKeySlots()).isEqualTo(9L);
+        assertThat(result.getActive()).isFalse();
+    }
+
+    @Test
+    void shouldNotOverwriteExistingFieldsWhenDtoValuesNull() {
+        final UserUpdateDto userUpdateDto = UserUpdateDto.builder().id(1L).active(false).build();
+        final User user = User.builder().id(1L).email("keep@example.com").apiKeySlots(3L).active(true).build();
+
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(user));
+
+        final var result = converter.convert(userUpdateDto);
+
+        assertThat(result.getEmail()).isEqualTo("keep@example.com");
+        assertThat(result.getApiKeySlots()).isEqualTo(3L);
+        assertThat(result.getActive()).isFalse();
+    }
+
+    @Test
     void shouldFailConvert() {
         final UserUpdateDto userUpdateDto = UserUpdateDto.builder().id(1L).build();
 

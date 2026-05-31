@@ -17,11 +17,19 @@ class UserTest {
     }
 
     @Test
-    void shouldInitializeOnCreate() {
+    void shouldDefaultToActiveOnCreateWhenUnset() {
         final var user = new User();
         user.onCreate();
 
         assertThat(user.getCreateDate()).isNotNull();
+        assertThat(user.getActive()).isTrue();
+    }
+
+    @Test
+    void shouldPreserveExplicitActiveFlagOnCreate() {
+        final var user = User.builder().active(false).build();
+        user.onCreate();
+
         assertThat(user.getActive()).isFalse();
     }
 }

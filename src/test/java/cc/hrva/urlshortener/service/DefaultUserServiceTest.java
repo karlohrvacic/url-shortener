@@ -5,6 +5,7 @@ import java.util.Optional;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.converter.UserToUserDtoConverter;
 import cc.hrva.urlshortener.converter.UserUpdateDtoToUserConverter;
+import cc.hrva.urlshortener.dto.DeleteAccountDto;
 import cc.hrva.urlshortener.dto.PasswordResetDto;
 import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
@@ -13,8 +14,13 @@ import cc.hrva.urlshortener.dto.UserSearchDto;
 import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.exception.UserNotFoundException;
+import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.ResetToken;
 import cc.hrva.urlshortener.model.User;
+import cc.hrva.urlshortener.repository.ApiKeyRepository;
+import cc.hrva.urlshortener.repository.IPAddressRepository;
+import cc.hrva.urlshortener.repository.ResetTokenRepository;
+import cc.hrva.urlshortener.repository.UrlRepository;
 import cc.hrva.urlshortener.repository.UserRepository;
 import cc.hrva.urlshortener.service.impl.DefaultSendingEmailService;
 import cc.hrva.urlshortener.service.impl.DefaultUserService;
@@ -53,13 +59,25 @@ class DefaultUserServiceTest {
     private AuthValidator authValidator;
 
     @Mock
+    private UrlRepository urlRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
+    private ApiKeyRepository apiKeyRepository;
+
+    @Mock
+    private IPAddressRepository ipAddressRepository;
+
+    @Mock
     private ResetTokenService resetTokenService;
+
+    @Mock
+    private ResetTokenRepository resetTokenRepository;
 
     @Mock
     private UserToUserDtoConverter userToUserDtoConverter;
@@ -72,7 +90,9 @@ class DefaultUserServiceTest {
 
     @BeforeEach
     void setUp() {
-        this.userService = new DefaultUserService(appProperties, authValidator, userRepository, passwordEncoder, resetTokenService, userToUserDtoConverter, sendingEmailService, userUpdateDtoToUserConverter);
+        this.userService = new DefaultUserService(appProperties, authValidator, urlRepository, userRepository,
+                passwordEncoder, apiKeyRepository, ipAddressRepository, resetTokenService, resetTokenRepository,
+                userToUserDtoConverter, sendingEmailService, userUpdateDtoToUserConverter);
         lenient().when(userRepository.findByEmail(null)).thenReturn(Optional.empty());
     }
 
@@ -173,9 +193,38 @@ class DefaultUserServiceTest {
     }
 
     @Test
-    void shouldDeleteUserById() {
+    void shouldDeleteUserByIdWithOwnedData() {
+        final var user = User.builder().id(1L).email("test@example.com").build();
+        final var urls = Collections.singletonList(cc.hrva.urlshortener.model.Url.builder().id(7L).build());
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(urlRepository.findByOwner(user)).thenReturn(urls);
+
         userService.deleteUserById(1L);
-        verify(userRepository).deleteById(1L);
+
+        verify(ipAddressRepository).deleteByUrlIn(urls);
+        verify(resetTokenRepository).deleteByUser(user);
+        verify(urlRepository).deleteByOwner(user);
+        verify(userRepository).delete(user);
+    }
+
+    @Test
+    void shouldDeleteUserByIdWithoutUrlsSkipsIpAddressCleanup() {
+        final var user = User.builder().id(1L).email("test@example.com").build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(urlRepository.findByOwner(user)).thenReturn(Collections.emptyList());
+
+        userService.deleteUserById(1L);
+
+        verify(ipAddressRepository, org.mockito.Mockito.never()).deleteByUrlIn(any());
+        verify(userRepository).delete(user);
+    }
+
+    @Test
+    void shouldFailDeleteUserByIdWhenNotFound() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.deleteUserById(1L))
+                .isInstanceOf(UserNotFoundException.class);
     }
 
     @Test
@@ -280,10 +329,28 @@ class DefaultUserServiceTest {
         when(userRepository.findByLastLoginIsLessThanEqualAndActiveTrue(any(java.time.LocalDateTime.class)))
                 .thenReturn(Collections.singletonList(user));
         when(userRepository.saveAll(any())).thenReturn(Collections.singletonList(user));
+        when(apiKeyRepository.findByOwnerAndActiveTrue(user)).thenReturn(Collections.emptyList());
 
         userService.deactivateUnusedUserAccounts();
 
         assertThat(user.getActive()).isFalse();
+        verify(sendingEmailService).sendEmailAccountDeactivated(user);
+    }
+
+    @Test
+    void shouldRevokeApiKeysWhenDeactivatingUnusedAccount() {
+        final var user = User.builder().id(1L).active(true).build();
+        final var key = ApiKey.builder().id(5L).active(true).owner(user).build();
+        when(appProperties.getDeactivateUserAccountAfterDays()).thenReturn(30L);
+        when(userRepository.findByLastLoginIsLessThanEqualAndActiveTrue(any(java.time.LocalDateTime.class)))
+                .thenReturn(Collections.singletonList(user));
+        when(userRepository.saveAll(any())).thenReturn(Collections.singletonList(user));
+        when(apiKeyRepository.findByOwnerAndActiveTrue(user)).thenReturn(Collections.singletonList(key));
+
+        userService.deactivateUnusedUserAccounts();
+
+        assertThat(key.isActive()).isFalse();
+        verify(apiKeyRepository).saveAll(Collections.singletonList(key));
     }
 
     @Test
@@ -294,5 +361,82 @@ class DefaultUserServiceTest {
         userService.userHasLoggedIn(user);
 
         assertThat(user.getLastLogin()).isNotNull();
+    }
+
+    @Test
+    void shouldCascadeDeactivationWhenUpdateDeactivatesUser() {
+        final var updateDto = UserUpdateDto.builder().id(1L).active(false).build();
+        final var existingUser = User.builder().id(1L).authProvider("local").active(true).build();
+        final var deactivated = User.builder().id(1L).email("test@example.com").active(false).build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userUpdateDtoToUserConverter.convert(updateDto)).thenReturn(deactivated);
+        when(userRepository.save(deactivated)).thenReturn(deactivated);
+        when(apiKeyRepository.findByOwnerAndActiveTrue(deactivated)).thenReturn(Collections.emptyList());
+
+        userService.updateUser(updateDto);
+
+        verify(sendingEmailService).sendEmailAccountDeactivated(deactivated);
+    }
+
+    @Test
+    void shouldNotCascadeWhenUpdateKeepsUserActive() {
+        final var updateDto = UserUpdateDto.builder().id(1L).active(true).build();
+        final var existingUser = User.builder().id(1L).authProvider("local").active(true).build();
+        final var stillActive = User.builder().id(1L).active(true).build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userUpdateDtoToUserConverter.convert(updateDto)).thenReturn(stillActive);
+        when(userRepository.save(stillActive)).thenReturn(stillActive);
+
+        userService.updateUser(updateDto);
+
+        verify(sendingEmailService, org.mockito.Mockito.never()).sendEmailAccountDeactivated(any());
+    }
+
+    @Test
+    void shouldSelfDeleteLocalAccountWithCorrectPassword() {
+        final var user = User.builder().id(1L).email("test@example.com").authProvider("local").password("enc").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("test@example.com", null));
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        userService.deleteOwnAccount(DeleteAccountDto.builder().password("myPassword").build());
+
+        verify(authValidator).passwordMatchesCurrentPassword(user, "myPassword");
+        verify(resetTokenRepository).deleteByUser(user);
+        verify(urlRepository).deleteByOwner(user);
+        verify(userRepository).delete(user);
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void shouldSelfDeleteOauthAccountWithoutPassword() {
+        final var user = User.builder().id(1L).email("g@example.com").authProvider("google").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("g@example.com", null));
+        when(userRepository.findByEmail("g@example.com")).thenReturn(Optional.of(user));
+
+        userService.deleteOwnAccount(new DeleteAccountDto());
+
+        verify(authValidator, org.mockito.Mockito.never()).passwordMatchesCurrentPassword(any(), any());
+        verify(userRepository).delete(user);
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void shouldFailSelfDeleteWhenPasswordIncorrect() {
+        final var user = User.builder().id(1L).email("test@example.com").authProvider("local").password("enc").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("test@example.com", null));
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        org.mockito.Mockito.doThrow(new NoAuthorizationException("Current password is incorrect"))
+                .when(authValidator).passwordMatchesCurrentPassword(user, "wrong");
+
+        assertThatThrownBy(() -> userService.deleteOwnAccount(DeleteAccountDto.builder().password("wrong").build()))
+                .isInstanceOf(NoAuthorizationException.class);
+
+        verify(userRepository, org.mockito.Mockito.never()).delete(any(User.class));
+        SecurityContextHolder.clearContext();
     }
 }

@@ -48,6 +48,7 @@ class DefaultApiKeyValidatorTest {
                 .createDate(LocalDateTime.now())
                 .expirationDate(LocalDateTime.now().plusDays(1L))
                 .active(true)
+                .owner(User.builder().id(1L).active(true).build())
                 .build();
     }
 
@@ -131,5 +132,29 @@ class DefaultApiKeyValidatorTest {
         assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
                 .isInstanceOf(InvalidApiKeyException.class)
                 .hasMessage("API key is invalid");
+    }
+
+    @Test
+    void shouldFailApiKeyExistsByKeyAndIsValidWhenOwnerInactive() {
+        final String key = "test";
+
+        apiKey.setOwner(User.builder().id(1L).active(false).build());
+        when(apiKeyRepository.findApiKeyByKey(key)).thenReturn(Optional.ofNullable(apiKey));
+
+        assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
+                .isInstanceOf(InvalidApiKeyException.class)
+                .hasMessage("API key owner account is inactive");
+    }
+
+    @Test
+    void shouldFailApiKeyExistsByKeyAndIsValidWhenOwnerMissing() {
+        final String key = "test";
+
+        apiKey.setOwner(null);
+        when(apiKeyRepository.findApiKeyByKey(key)).thenReturn(Optional.ofNullable(apiKey));
+
+        assertThatCode(() -> apiKeyValidator.apiKeyExistsByKeyAndIsValid(key))
+                .isInstanceOf(InvalidApiKeyException.class)
+                .hasMessage("API key owner account is inactive");
     }
 }

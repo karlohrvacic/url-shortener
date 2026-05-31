@@ -83,7 +83,10 @@ public class DefaultAdminService implements AdminService {
 
     @Override
     public AdminStatsResponse getDashboardStats() {
+        final var now = LocalDateTime.now();
         final var totalUsers = userRepository.count();
+        final var newUsers7d = userRepository.countByCreateDateAfter(now.minusDays(7));
+        final var newUsers30d = userRepository.countByCreateDateAfter(now.minusDays(30));
         final var totalUrls = urlRepository.count();
         final var activeUrls = urlRepository.countByActiveTrue();
         final var totalApiKeys = apiKeyRepository.count();
@@ -96,7 +99,7 @@ public class DefaultAdminService implements AdminService {
         final var redirectTimer = getRedirectTimer();
 
         return buildAdminStatsResponse(
-                totalUsers, totalUrls, activeUrls, totalApiKeys,
+                totalUsers, newUsers7d, newUsers30d, totalUrls, activeUrls, totalApiKeys,
                 uptimeFormatted, recentUrls, cacheHitRatio, activeProfiles,
                 jvmMemory, requestsCount, redirectTimer);
     }
@@ -115,6 +118,8 @@ public class DefaultAdminService implements AdminService {
 
     private AdminStatsResponse buildAdminStatsResponse(
             final long totalUsers,
+            final long newUsers7d,
+            final long newUsers30d,
             final long totalUrls,
             final long activeUrls,
             final long totalApiKeys,
@@ -127,6 +132,8 @@ public class DefaultAdminService implements AdminService {
             final RedirectTiming redirectTimer) {
         return new AdminStatsResponse(
                 totalUsers,
+                newUsers7d,
+                newUsers30d,
                 totalUrls,
                 activeUrls,
                 totalApiKeys,

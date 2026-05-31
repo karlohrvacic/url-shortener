@@ -93,6 +93,24 @@ class UserControllerTest {
     }
 
     @Test
+    void shouldDeleteOwnAccount() throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"myPassword\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(userService).deleteOwnAccount(any());
+    }
+
+    @Test
+    void shouldDeleteOwnAccountWithoutBody() throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me"))
+                .andExpect(status().isNoContent());
+
+        verify(userService).deleteOwnAccount(any());
+    }
+
+    @Test
     void shouldUpdatePassword() throws Exception {
         final var user = User.builder().id(1L).email("test@example.com").build();
         when(userService.updatePassword(any(UpdatePasswordDto.class))).thenReturn(user);

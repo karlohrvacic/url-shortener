@@ -31,7 +31,15 @@ public class DefaultUserDetailsService implements UserDetailsService {
                 .stream()
                 .map(authority -> new SimpleGrantedAuthority(authority.getName()))
                 .toList();
-        return new org.springframework.security.core.userdetails.User(user.getEmail(), user.getPassword(), grantedAuthorities);
+        final var enabled = !Boolean.FALSE.equals(user.getActive());
+        return new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword(),
+                enabled,
+                true,
+                true,
+                true,
+                grantedAuthorities);
     }
 
 }

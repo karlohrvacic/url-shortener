@@ -4,6 +4,7 @@ import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.model.User;
 import cc.hrva.urlshortener.repository.UserRepository;
 import cc.hrva.urlshortener.service.AuthoritiesService;
+import cc.hrva.urlshortener.service.SendingEmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -30,16 +31,19 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final AuthoritiesService authoritiesService;
     private final TokenProvider tokenProvider;
     private final AppProperties appProperties;
+    private final SendingEmailService sendingEmailService;
 
     public OAuth2LoginSuccessHandler(
             final UserRepository userRepository,
             final AuthoritiesService authoritiesService,
             final TokenProvider tokenProvider,
-            final AppProperties appProperties) {
+            final AppProperties appProperties,
+            final SendingEmailService sendingEmailService) {
         this.userRepository = userRepository;
         this.authoritiesService = authoritiesService;
         this.tokenProvider = tokenProvider;
         this.appProperties = appProperties;
+        this.sendingEmailService = sendingEmailService;
     }
 
     @Override
@@ -60,6 +64,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         final var user = userRepository.findByEmail(email)
                 .orElseGet(() -> createOAuth2User(email, "google"));
+
+        if (Boolean.FALSE.equals(user.getActive())) {
+            log.warn("OAuth2 login blocked: inactive account email={}", email);
+            response.sendRedirect(appProperties.getFrontendUrl() + "/auth/callback?error=account_inactive");
+            return;
+        }
+
+        user.userLoggedIn();
+        userRepository.save(user);
 
         final var springAuth = new UsernamePasswordAuthenticationToken(
                 user.getEmail(), null,
@@ -93,6 +106,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         final var saved = userRepository.save(newUser);
         log.info("Created OAuth2 user email={}", email);
+        sendingEmailService.sendNewUserNotificationToAdmin(saved);
         return saved;
     }
 

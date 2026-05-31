@@ -88,6 +88,31 @@ public class DefaultSendingEmailService implements SendingEmailService {
 
     @Override
     @Async
+    public void sendNewUserNotificationToAdmin(final User user) {
+        final var provider = user.getAuthProvider() != null ? user.getAuthProvider() : "local";
+        final var body = """
+                <p>A new user just registered on %s.</p>
+                <p><strong>Email:</strong> %s</p>
+                <p><strong>Auth provider:</strong> %s</p>
+                <p><strong>Registered at:</strong> %s</p>
+                """.formatted(
+                appProperties.getAppName(),
+                user.getEmail(),
+                provider,
+                LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+
+        final var email = Email.builder()
+                .sender(appProperties.getEmailSenderAddress())
+                .receivers(new String[]{appProperties.getContactEmail()})
+                .subject("New user registered: %s".formatted(user.getEmail()))
+                .text(body)
+                .build();
+
+        tryToSendEmail(email);
+    }
+
+    @Override
+    @Async
     public void sendEmailUrlMalwareDetected(final User user, final Url url, final String threatType) {
         final var ctx = getContext(user);
         ctx.setVariable("shortUrl", url.getShortUrl());

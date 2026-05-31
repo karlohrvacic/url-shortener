@@ -23,5 +23,7 @@ public interface UrlRepository extends JpaRepository<Url, Long>, JpaSpecificatio
     List<Url> findByExpirationDateLessThanEqualAndActiveTrue(LocalDateTime expirationDate);
     List<Url> findByExpirationDateBetweenAndActiveTrueAndOwnerIsNotNull(LocalDateTime start, LocalDateTime end);
     long countByActiveTrue();
+    List<Url> findByOwner(User owner);
+    void deleteByOwner(User owner);
 
 }

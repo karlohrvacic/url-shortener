@@ -1,5 +1,6 @@
 package cc.hrva.urlshortener.controller;
 
+import cc.hrva.urlshortener.dto.DeleteAccountDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
 import cc.hrva.urlshortener.dto.UserDto;
 import cc.hrva.urlshortener.dto.UserSearchDto;
@@ -67,6 +68,17 @@ public class UserController {
             @Valid @RequestBody final UserUpdateDto userUpdateDto) {
         userUpdateDto.setId(id);
         return ResponseEntity.ok(userService.updateUser(userUpdateDto));
+    }
+
+    @Operation(summary = "Delete own account", description = "Permanently delete the authenticated user's account along with all their URLs and API keys. Local accounts must confirm with their current password.")
+    @ApiResponse(responseCode = "204", description = "Account deleted")
+    @ApiResponse(responseCode = "403", description = "Password does not match")
+    @DeleteMapping("/me")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_USER')")
+    public ResponseEntity<Void> deleteOwnAccount(@RequestBody(required = false) final DeleteAccountDto deleteAccountDto) {
+        userService.deleteOwnAccount(deleteAccountDto != null ? deleteAccountDto : new DeleteAccountDto());
+
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Update password", description = "Update the password for the authenticated user.")

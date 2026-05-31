@@ -7,6 +7,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import cc.hrva.urlshortener.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,6 +22,7 @@ public class JwtFilter extends GenericFilterBean {
   public static final String AUTHORIZATION_HEADER = "Authorization";
 
   private final TokenProvider tokenProvider;
+  private final UserRepository userRepository;
 
   @Override
   public void doFilter(final ServletRequest servletRequest, final ServletResponse servletResponse, final FilterChain filterChain)
@@ -32,9 +34,17 @@ public class JwtFilter extends GenericFilterBean {
     final var jwt = getToken(httpServletRequest);
     if (StringUtils.hasText(jwt) && this.tokenProvider.validateToken(jwt)) {
       final Authentication authentication = this.tokenProvider.getAuthentication(jwt);
-      SecurityContextHolder.getContext().setAuthentication(authentication);
+      if (isActiveUser(authentication.getName())) {
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+      }
     }
     filterChain.doFilter(servletRequest, servletResponse);
+  }
+
+  private boolean isActiveUser(final String email) {
+    return userRepository.findByEmail(email)
+        .map(user -> !Boolean.FALSE.equals(user.getActive()))
+        .orElse(false);
   }
 
   private String getToken(final HttpServletRequest request) {

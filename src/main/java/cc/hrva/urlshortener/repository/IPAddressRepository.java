@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 public interface IPAddressRepository extends JpaRepository<IPAddress, Long> {
 
     List<IPAddress> findAllByUrl(Url url);
+    void deleteByUrlIn(List<Url> urls);
     List<IPAddress> findByUrlAndActiveTrue(Url url);
     List<IPAddress> findByCreateDateIsLessThanEqualAndActiveTrue(LocalDateTime createDate);
     List<IPAddress> findByCreateDateIsLessThanEqualAndActiveFalse(LocalDateTime createDate);

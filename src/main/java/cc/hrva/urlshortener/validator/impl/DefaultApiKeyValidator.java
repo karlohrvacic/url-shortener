@@ -39,6 +39,10 @@ public class DefaultApiKeyValidator implements ApiKeyValidator {
         if (!apiKey.isActive()) {
             throw new InvalidApiKeyException("API key is invalid");
         }
+
+        if (apiKey.getOwner() == null || Boolean.FALSE.equals(apiKey.getOwner().getActive())) {
+            throw new InvalidApiKeyException("API key owner account is inactive");
+        }
     }
 
     @Override

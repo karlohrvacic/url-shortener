@@ -5,6 +5,8 @@ import java.util.List;
 
 public record AdminStatsResponse(
         long totalUsers,
+        long newUsers7d,
+        long newUsers30d,
         long totalUrls,
         long activeUrls,
         long totalApiKeys,

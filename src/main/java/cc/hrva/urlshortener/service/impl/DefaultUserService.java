@@ -3,6 +3,7 @@ package cc.hrva.urlshortener.service.impl;
 import cc.hrva.urlshortener.configuration.properties.AppProperties;
 import cc.hrva.urlshortener.converter.UserToUserDtoConverter;
 import cc.hrva.urlshortener.converter.UserUpdateDtoToUserConverter;
+import cc.hrva.urlshortener.dto.DeleteAccountDto;
 import cc.hrva.urlshortener.dto.PasswordResetDto;
 import cc.hrva.urlshortener.dto.RequestPasswordResetDto;
 import cc.hrva.urlshortener.dto.UpdatePasswordDto;
@@ -12,7 +13,12 @@ import cc.hrva.urlshortener.dto.UserUpdateDto;
 import cc.hrva.urlshortener.exception.ApiException;
 import cc.hrva.urlshortener.exception.NoAuthorizationException;
 import cc.hrva.urlshortener.exception.UserNotFoundException;
+import cc.hrva.urlshortener.model.ApiKey;
 import cc.hrva.urlshortener.model.User;
+import cc.hrva.urlshortener.repository.ApiKeyRepository;
+import cc.hrva.urlshortener.repository.IPAddressRepository;
+import cc.hrva.urlshortener.repository.ResetTokenRepository;
+import cc.hrva.urlshortener.repository.UrlRepository;
 import cc.hrva.urlshortener.repository.UserRepository;
 import cc.hrva.urlshortener.repository.specification.UserSpecification;
 import cc.hrva.urlshortener.service.ResetTokenService;
@@ -40,9 +46,13 @@ public class DefaultUserService implements UserService {
 
     private final AppProperties appProperties;
     private final AuthValidator authValidator;
+    private final UrlRepository urlRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ApiKeyRepository apiKeyRepository;
+    private final IPAddressRepository ipAddressRepository;
     private final ResetTokenService resetTokenService;
+    private final ResetTokenRepository resetTokenRepository;
     private final UserToUserDtoConverter userToUserDtoConverter;
     private final DefaultSendingEmailService sendingEmailService;
     private final UserUpdateDtoToUserConverter userUpdateDtoToUserConverter;
@@ -53,6 +63,7 @@ public class DefaultUserService implements UserService {
         final var savedUser = userRepository.save(user);
         log.info("User registered email={}", savedUser.getEmail());
         sendingEmailService.sendWelcomeEmail(savedUser);
+        sendingEmailService.sendNewUserNotificationToAdmin(savedUser);
 
         return savedUser;
     }
@@ -118,7 +129,41 @@ public class DefaultUserService implements UserService {
     @Transactional
     public void deleteUserById(final Long id) {
         log.info("Delete user id={}", id);
-        userRepository.deleteById(id);
+        final var user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        deleteUserAndOwnedData(user);
+    }
+
+    @Override
+    @Transactional
+    public void deleteOwnAccount(final DeleteAccountDto deleteAccountDto) {
+        final var user = getUserFromToken();
+        if (user == null) {
+            throw new NoAuthorizationException("Not authenticated");
+        }
+
+        if (isLocalAccount(user)) {
+            authValidator.passwordMatchesCurrentPassword(user, deleteAccountDto.getPassword());
+        }
+
+        log.info("Self-delete account id={}", user.getId());
+        deleteUserAndOwnedData(user);
+    }
+
+    private void deleteUserAndOwnedData(final User user) {
+        final var urls = urlRepository.findByOwner(user);
+        if (!urls.isEmpty()) {
+            ipAddressRepository.deleteByUrlIn(urls);
+        }
+        resetTokenRepository.deleteByUser(user);
+        urlRepository.deleteByOwner(user);
+        // API keys are removed via CascadeType.ALL on User.apiKeys when the user is deleted.
+        userRepository.delete(user);
+        log.info("Deleted user id={} and all owned URLs and API keys", user.getId());
+    }
+
+    private boolean isLocalAccount(final User user) {
+        return user.getAuthProvider() == null || "local".equals(user.getAuthProvider());
     }
 
     @Override
@@ -134,7 +179,14 @@ public class DefaultUserService implements UserService {
             throw new ApiException("Email cannot be changed for %s accounts".formatted(existingUser.getAuthProvider()));
         }
 
-        return userRepository.save(Objects.requireNonNull(userUpdateDtoToUserConverter.convert(userUpdateDto)));
+        final var wasActive = !Boolean.FALSE.equals(existingUser.getActive());
+        final var updatedUser = userRepository.save(Objects.requireNonNull(userUpdateDtoToUserConverter.convert(userUpdateDto)));
+
+        if (wasActive && Boolean.FALSE.equals(updatedUser.getActive())) {
+            cascadeDeactivation(updatedUser);
+        }
+
+        return updatedUser;
     }
 
     @Override
@@ -205,8 +257,20 @@ public class DefaultUserService implements UserService {
     private User deactivateUser(final User user) {
         user.setActive(false);
         log.info("Deactivated user with id {}", user.getId());
+        cascadeDeactivation(user);
 
         return user;
+    }
+
+    private void cascadeDeactivation(final User user) {
+        final var activeKeys = apiKeyRepository.findByOwnerAndActiveTrue(user);
+        activeKeys.forEach(ApiKey::deactivate);
+        apiKeyRepository.saveAll(activeKeys);
+        if (!activeKeys.isEmpty()) {
+            log.info("Revoked {} API keys for deactivated user id={}", activeKeys.size(), user.getId());
+        }
+
+        sendingEmailService.sendEmailAccountDeactivated(user);
     }
 
 }

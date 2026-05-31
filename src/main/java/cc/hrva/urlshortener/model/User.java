@@ -60,7 +60,9 @@ public class User {
     @PrePersist
     public void onCreate() {
         this.createDate = LocalDateTime.now();
-        this.active = false;
+        if (this.active == null) {
+            this.active = true;
+        }
     }
 
     public void userLoggedIn() {

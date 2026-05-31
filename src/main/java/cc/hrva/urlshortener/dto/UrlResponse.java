@@ -21,6 +21,8 @@ public record UrlResponse(
         Long visitLimit,
         @Schema(description = "Whether the URL is active", example = "true")
         boolean active,
+        @Schema(description = "Reason for the current state: ACTIVE, LIMIT_REACHED, EXPIRED, BLOCKED, DEACTIVATED", example = "ACTIVE")
+        String status,
         @Schema(description = "Email of the URL owner", example = "user@example.com")
         String ownerEmail) {
 
@@ -34,7 +36,25 @@ public record UrlResponse(
                 url.getVisits(),
                 url.getVisitLimit(),
                 url.isActive(),
+                resolveStatus(url),
                 url.getOwner() != null ? url.getOwner().getEmail() : null);
+    }
+
+    private static String resolveStatus(final Url url) {
+        if (url.isActive()) {
+            return "ACTIVE";
+        }
+        if (url.getThreatType() != null) {
+            return "BLOCKED";
+        }
+        if (url.getVisitLimit() != null && url.getVisits() != null
+                && url.getVisits() >= url.getVisitLimit()) {
+            return "LIMIT_REACHED";
+        }
+        if (url.getExpirationDate() != null && url.getExpirationDate().isBefore(LocalDateTime.now())) {
+            return "EXPIRED";
+        }
+        return "DEACTIVATED";
     }
 
 }

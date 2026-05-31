@@ -19,6 +19,8 @@ public record ApiKeyResponse(
         LocalDateTime expirationDate,
         @Schema(description = "Whether the API key is active", example = "true")
         boolean active,
+        @Schema(description = "Reason for the current state: ACTIVE, LIMIT_REACHED, EXPIRED, REVOKED", example = "ACTIVE")
+        String status,
         @Schema(description = "Email of the key owner", example = "user@example.com")
         String ownerEmail) {
 
@@ -31,7 +33,22 @@ public record ApiKeyResponse(
                 apiKey.getCreateDate(),
                 apiKey.getExpirationDate(),
                 apiKey.isActive(),
+                resolveStatus(apiKey),
                 apiKey.getOwner() != null ? apiKey.getOwner().getEmail() : null);
+    }
+
+    private static String resolveStatus(final ApiKey apiKey) {
+        if (apiKey.isActive()) {
+            return "ACTIVE";
+        }
+        if (apiKey.getApiCallsLimit() != null && apiKey.getApiCallsUsed() != null
+                && apiKey.getApiCallsUsed() >= apiKey.getApiCallsLimit()) {
+            return "LIMIT_REACHED";
+        }
+        if (apiKey.getExpirationDate() != null && apiKey.getExpirationDate().isBefore(LocalDateTime.now())) {
+            return "EXPIRED";
+        }
+        return "REVOKED";
     }
 
 }
